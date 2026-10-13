@@ -1,0 +1,139 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  color-scheme: light;
+  --color-ink: #202638;
+  --color-ink-soft: #374156;
+  --color-muted: #58647a;
+  --color-subtle: #707c91;
+  --color-faint: #8792a5;
+  --color-line: #e1e5ed;
+  --color-line-strong: #cbd2df;
+  --color-surface: #fff;
+  --color-surface-raised: #fff;
+  --color-surface-muted: #f6f7fb;
+  --color-canvas: #f5f6fa;
+  --color-accent: #5e55e8;
+  --color-accent-hover: #4d44d0;
+  --color-accent-pressed: #4039b8;
+  --color-accent-soft: #eeedff;
+  --color-accent-line: #d8d5ff;
+  --color-green: #16794f;
+  --color-green-soft: #e8f6ee;
+  --color-amber: #915807;
+  --color-amber-soft: #fff4df;
+  --color-red: #b9384a;
+  --color-red-soft: #ffedf0;
+  --color-blue: #2b63b7;
+  --color-blue-soft: #eaf2ff;
+  --color-focus: #746dff;
+  --color-white: #fff;
+  --color-accent-deep: #4038b2;
+  --color-accent-label: #5148c5;
+  --color-accent-disabled: #aaa6e9;
+  --color-accent-wash: #faf9ff;
+  --color-accent-wash-hover: #fcfbff;
+  --color-accent-badge: #f5f4ff;
+  --color-accent-pill: #f7f6ff;
+  --color-blue-line: #cddfff;
+  --color-green-line: #c8e8d6;
+  --color-amber-line: #f0d9ae;
+  --color-progress-track: #e9ebf2;
+  --color-surface-hover: #fbfbfe;
+  --color-error-line: #efc7cd;
+  --color-error-surface: #fffafb;
+  --color-success-indicator: #22a06b;
+  --color-avatar-one: #586d91;
+  --color-avatar-two: #93624f;
+  --color-avatar-three: #486d5d;
+  --color-scrim: rgb(20 27 43 / 42%);
+  --color-topbar-overlay: rgb(255 255 255 / 96%);
+
+  --font-size-xs: .75rem;
+  --font-size-sm: .8125rem;
+  --font-size-md: .9375rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.375rem;
+  --font-size-display: clamp(1.75rem, 2.4vw, 2.125rem);
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+
+  --space-1: .25rem;
+  --space-2: .5rem;
+  --space-3: .75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  --radius-sm: .5rem;
+  --radius-md: .75rem;
+  --radius-lg: 1rem;
+  --radius-pill: 999px;
+  --shadow-panel: 0 1px 2px rgb(23 31 51 / 4%), 0 8px 24px rgb(23 31 51 / 3%);
+  --shadow-popover: 0 16px 40px rgb(25 33 55 / 14%);
+  --shadow-primary: 0 2px 5px rgb(58 49 170 / 18%);
+  --shadow-primary-hover: 0 4px 10px rgb(58 49 170 / 20%);
+  --focus-ring: 0 0 0 3px rgb(94 85 232 / 24%);
+  --focus-ring-error: 0 0 0 3px rgb(185 56 74 / 18%);
+  --sidebar-width: 16.5rem;
+  --sidebar-width-compact: 4.75rem;
+  --topbar-height: 4rem;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--color-canvas);
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+}
+
+button, input, select, textarea { font: inherit; }
+button { color: inherit; }
+button:not(:disabled) { cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; }
+::selection { color: var(--color-ink); background: var(--color-accent-line); }
+
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: var(--space-3);
+  left: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  transform: translateY(-160%);
+  border-radius: var(--radius-sm);
+  background: var(--color-ink);
+  color: white;
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+}
+.skip-link:focus { transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
