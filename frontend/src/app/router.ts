@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react'
 
 export type AppRoute =
+  | { page: 'login' }
   | { page: 'dashboard' }
-  | { page: 'projects' }
+  | { page: 'projects'; create?: boolean }
   | { page: 'team-members' }
   | { page: 'project-detail'; id: number }
   | { page: 'tasks' }
@@ -28,22 +29,24 @@ function subscribe(listener: () => void) {
 }
 
 function currentPath() {
-  return typeof window === 'undefined' ? '/' : window.location.pathname
+  return typeof window === 'undefined' ? '/' : `${window.location.pathname}${window.location.search}`
 }
 
 export function parseRoute(path: string): AppRoute {
-  if (path === '/' || path === '/dashboard') return { page: 'dashboard' }
-  if (path === '/projects') return { page: 'projects' }
-  if (path === '/team-members') return { page: 'team-members' }
-  if (path === '/tasks') return { page: 'tasks' }
-  if (path === '/timeline') return { page: 'timeline' }
-  if (path === '/ai-planner') return { page: 'ai-planner' }
-  if (path === '/notifications') return { page: 'notifications' }
-  if (path === '/profile') return { page: 'profile' }
-  if (path === '/settings') return { page: 'settings' }
-  const projectMatch = path.match(/^\/projects\/(\d+)$/)
+  const [pathname, search = ''] = path.split('?')
+  if (pathname === '/login') return { page: 'login' }
+  if (pathname === '/' || pathname === '/dashboard') return { page: 'dashboard' }
+  if (pathname === '/projects') return { page: 'projects', create: new URLSearchParams(search).get('create') === '1' }
+  if (pathname === '/team-members') return { page: 'team-members' }
+  if (pathname === '/tasks') return { page: 'tasks' }
+  if (pathname === '/timeline') return { page: 'timeline' }
+  if (pathname === '/ai-planner') return { page: 'ai-planner' }
+  if (pathname === '/notifications') return { page: 'notifications' }
+  if (pathname === '/profile') return { page: 'profile' }
+  if (pathname === '/settings') return { page: 'settings' }
+  const projectMatch = pathname.match(/^\/projects\/(\d+)$/)
   if (projectMatch) return { page: 'project-detail', id: Number(projectMatch[1]) }
-  const taskMatch = path.match(/^\/tasks\/(\d+)$/)
+  const taskMatch = pathname.match(/^\/tasks\/(\d+)$/)
   if (taskMatch) return { page: 'task-detail', id: Number(taskMatch[1]) }
   return { page: 'not-found' }
 }

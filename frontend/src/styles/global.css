@@ -74,8 +74,12 @@ kbd { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-line
 .profile-button__copy { flex: 1; }
 .profile-avatar, .avatar { display: grid; flex: 0 0 auto; place-items: center; border: 2px solid var(--color-surface); border-radius: 50%; background: var(--color-accent-soft); color: var(--color-accent-deep); font-size: 11px; font-weight: 750; }
 .profile-avatar { width: 2.125rem; height: 2.125rem; }
+.profile-avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
 .profile-button > svg { width: 1rem; height: 1rem; color: var(--color-subtle); }
 .profile-button:disabled { opacity: .8; }
+.sign-out-button { display: flex; width: 100%; min-height: 2.5rem; align-items: center; padding: 0 var(--space-3); gap: var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-muted); font-size: var(--font-size-sm); text-align: left; }
+.sign-out-button:hover { background: var(--color-red-soft); color: var(--color-red); }
+.sign-out-button svg { width: 1rem; height: 1rem; flex: 0 0 auto; }
 
 .app-shell__main { min-height: 100vh; margin-left: var(--sidebar-width); transition: margin-left .18s ease; }
 .topbar { position: sticky; z-index: 30; top: 0; display: flex; align-items: center; height: var(--topbar-height); padding: 0 var(--space-8); border-bottom: 1px solid var(--color-line); background: var(--color-topbar-overlay); backdrop-filter: blur(12px); }
@@ -296,6 +300,10 @@ kbd { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-line
 .notification-row p { margin: var(--space-1) 0; color: var(--color-muted); font-size: var(--font-size-sm); }
 .notification-row time { color: var(--color-subtle); font-size: var(--font-size-xs); }
 .settings-panel { padding-bottom: var(--space-5); }
+.account-profile-list { display: grid; max-width: 42rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: var(--space-5); gap: var(--space-4); }
+.account-profile-list > div { min-width: 0; padding: var(--space-4); border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-surface-muted); }
+.account-profile-list dt { margin-bottom: var(--space-1); color: var(--color-subtle); font-size: var(--font-size-xs); font-weight: 700; }
+.account-profile-list dd { margin: 0; overflow-wrap: anywhere; color: var(--color-ink); font-weight: 650; }
 .settings-form { max-width: 42rem; padding: var(--space-5); }
 .settings-form__actions { display: flex; align-items: center; gap: var(--space-3); }
 .settings-form__actions > span { color: var(--color-green); font-size: var(--font-size-sm); }
@@ -444,7 +452,7 @@ kbd { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-line
 .mobile-scrim { display: none; }
 .app-shell--collapsed .sidebar { width: var(--sidebar-width-compact); padding-right: var(--space-2); padding-left: var(--space-2); }
 .app-shell--collapsed .app-shell__main { margin-left: var(--sidebar-width-compact); }
-.sidebar--collapsed .brand-name, .sidebar--collapsed .workspace-switcher__copy, .sidebar--collapsed .workspace-switcher > svg, .sidebar--collapsed .sidebar-search span, .sidebar--collapsed .sidebar-search kbd, .sidebar--collapsed .sidebar__create span, .sidebar--collapsed .nav-label, .sidebar--collapsed .nav-link span, .sidebar--collapsed .storage, .sidebar--collapsed .profile-button__copy, .sidebar--collapsed .profile-button > svg { display: none; }
+.sidebar--collapsed .brand-name, .sidebar--collapsed .workspace-switcher__copy, .sidebar--collapsed .workspace-switcher > svg, .sidebar--collapsed .sidebar-search span, .sidebar--collapsed .sidebar-search kbd, .sidebar--collapsed .sidebar__create span, .sidebar--collapsed .nav-label, .sidebar--collapsed .nav-link span, .sidebar--collapsed .storage, .sidebar--collapsed .profile-button__copy, .sidebar--collapsed .profile-button > svg, .sidebar--collapsed .sign-out-button span { display: none; }
 .sidebar--collapsed .sidebar__brand-row { justify-content: space-between; padding: 0; }
 .sidebar--collapsed .brand-mark, .sidebar--collapsed .sidebar__collapse { width: 1.75rem; height: 1.75rem; }
 .sidebar--collapsed .sidebar__collapse { margin: 0; transform: none; }
@@ -455,6 +463,7 @@ kbd { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-line
 .sidebar--collapsed .nav-link { justify-content: center; padding: 0; }
 .sidebar--collapsed .nav-link svg { width: 1.25rem; height: 1.25rem; }
 .sidebar--collapsed .profile-button { justify-content: center; padding: var(--space-4) 0 var(--space-1); }
+.sidebar--collapsed .sign-out-button { justify-content: center; padding: 0; }
 
 @media (max-width: 75rem) {
   .main-content { padding-right: var(--space-6); padding-left: var(--space-6); }
@@ -485,7 +494,7 @@ kbd { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-line
   .sidebar, .app-shell--collapsed .sidebar { z-index: 40; width: min(19rem, calc(100vw - 3rem)); padding: var(--space-5) var(--space-4) var(--space-3); transform: translateX(-105%); box-shadow: none; }
   .sidebar--mobile-open { transform: translateX(0); box-shadow: var(--shadow-popover); }
   .mobile-scrim { position: fixed; z-index: 30; inset: 0; display: block; width: 100%; height: 100%; border: 0; background: var(--color-scrim); }
-  .sidebar .brand-name, .sidebar .sidebar__collapse, .sidebar .workspace-switcher__copy, .sidebar .workspace-switcher > svg, .sidebar .sidebar-search span, .sidebar .sidebar-search kbd, .sidebar .sidebar__create span, .sidebar .nav-label, .sidebar .nav-link span, .sidebar .storage, .sidebar .profile-button__copy, .sidebar .profile-button > svg { display: initial; }
+  .sidebar .brand-name, .sidebar .sidebar__collapse, .sidebar .workspace-switcher__copy, .sidebar .workspace-switcher > svg, .sidebar .sidebar-search span, .sidebar .sidebar-search kbd, .sidebar .sidebar__create span, .sidebar .nav-label, .sidebar .nav-link span, .sidebar .storage, .sidebar .profile-button__copy, .sidebar .profile-button > svg, .sidebar .sign-out-button span { display: initial; }
   .sidebar .sidebar__collapse { display: inline-grid; }
   .sidebar .workspace-switcher__copy, .sidebar .profile-button__copy { display: grid; }
   .sidebar .nav-label { display: block; }
@@ -500,6 +509,7 @@ kbd { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-line
   .sidebar .nav-link svg { width: 1.125rem; height: 1.125rem; }
   .sidebar .storage { display: block; }
   .sidebar .profile-button { justify-content: flex-start; padding: var(--space-4) var(--space-2) var(--space-1); }
+  .sidebar .sign-out-button { justify-content: flex-start; padding: 0 var(--space-2); }
   .app-shell__main, .app-shell--collapsed .app-shell__main { margin-left: 0; }
   .app-shell--collapsed .sidebar { width: min(19rem, calc(100vw - 3rem)); }
   .topbar { height: 3.75rem; padding: 0 var(--space-3); }
@@ -553,6 +563,7 @@ kbd { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-line
   .draft-review__body, .planner-upload__body { padding: var(--space-3); }
   .draft-review__columns { grid-template-columns: 1fr; }
   .draft-fields { grid-template-columns: 1fr; }
+  .account-profile-list { grid-template-columns: 1fr; padding: var(--space-3); }
   .draft-approve { align-items: stretch; }
   .draft-approve .button { width: 100%; }
   .planner-file-actions { display: grid; grid-template-columns: 1fr; }

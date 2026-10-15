@@ -10,6 +10,7 @@ export function AppShell({ activePage, pageTitle, onNavigate, children }: { acti
   const sidebarRef = useRef<HTMLElement | null>(null)
   const menuButtonRef = useRef<HTMLButtonElement | null>(null)
   const { persistenceNotice } = useDemoWorkspace()
+  const serverBacked = ['Projects', 'Project details', 'Team Members', 'Profile'].includes(pageTitle)
 
   const closeMobileNav = useCallback(() => {
     setMobileOpen(false)
@@ -60,7 +61,7 @@ export function AppShell({ activePage, pageTitle, onNavigate, children }: { acti
     />
     <div className="app-shell__main">
       <TopBar menuButtonRef={(node) => { menuButtonRef.current = node }} menuExpanded={mobileOpen} onMenu={() => setMobileOpen(true)} pageTitle={pageTitle} onNavigate={onNavigate} />
-      <div className="demo-mode-banner" role="status"><span className="demo-mode-banner__dot" /><span>{activePage === 'Team members' ? <><strong>Live project membership</strong> · This tab reads and writes project roster data through the server; other workspace pages may still use browser demo data.</> : <><strong>Demo mode</strong> · Changes are saved only in this browser and are not sent to the project server.</>}</span></div>
+      <div className="demo-mode-banner" role="status"><span className="demo-mode-banner__dot" /><span>{serverBacked ? <><strong>Server data</strong> · This page reads account or project records from the backend.</> : <><strong>Demo mode</strong> · Changes on this page are saved only in this browser and are not sent to the project server.</>}</span></div>
       {persistenceNotice && <div className="storage-warning" role="alert">{persistenceNotice}</div>}
       <main id="main-content" className="main-content">{children}</main>
     </div>

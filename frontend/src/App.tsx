@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { DemoWorkspaceProvider } from './app/DemoWorkspaceProvider'
+import { AuthProvider, useAuth } from './app/AuthProvider'
 import { useAppRoute, navigate } from './app/router'
 import { AppShell } from './components/layout/AppShell'
 import { DashboardPage } from './features/dashboard/DashboardPage'
@@ -10,8 +12,10 @@ import { ProfilePage } from './features/profile/ProfilePage'
 import { SettingsPage } from './features/profile/SettingsPage'
 import { TimelinePage } from './features/timeline/TimelinePage'
 import { TeamMembersPage } from './features/team/TeamMembersPage'
+import { AuthLoadingPage, AuthUnavailablePage, LoginPage } from './features/auth/LoginPage'
 
 const pageMeta = {
+  login: ['Sign in', 'Sign in'],
   dashboard: ['Dashboard', 'Dashboard'],
   projects: ['Projects', 'Projects'],
   'team-members': ['Team members', 'Team Members'],
@@ -28,9 +32,30 @@ const pageMeta = {
 
 function RoutedApp() {
   const route = useAppRoute()
+  const { user, status, error: authError, refresh } = useAuth()
   const [activePage, pageTitle] = pageMeta[route.page]
+
+  useEffect(() => {
+    if (status !== 'ready') return
+    if (!user && route.page !== 'login') {
+      const requested = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      navigate(`/login?redirect=${encodeURIComponent(requested)}`, { replace: true })
+      return
+    }
+    if (user && route.page === 'login') {
+      const requested = new URLSearchParams(window.location.search).get('redirect')
+      const target = requested?.startsWith('/') && !requested.startsWith('//') ? requested : '/dashboard'
+      navigate(target, { replace: true })
+    }
+  }, [status, user, route.page])
+
+  if (status === 'loading') return <AuthLoadingPage />
+  if (status === 'unavailable') return <AuthUnavailablePage message={authError || 'Confirm that the backend is running, then retry.'} onRetry={() => void refresh()} />
+  if (!user) return <LoginPage />
+  if (route.page === 'login') return <AuthLoadingPage message="Opening your workspace…" />
+
   let page = <DashboardPage />
-  if (route.page === 'projects') page = <ProjectsPage />
+  if (route.page === 'projects') page = <ProjectsPage openCreate={route.create} />
   if (route.page === 'team-members') page = <TeamMembersPage />
   if (route.page === 'project-detail') page = <ProjectDetailPage id={route.id} />
   if (route.page === 'tasks') page = <TasksPage />
@@ -49,5 +74,5 @@ function RoutedApp() {
 }
 
 export default function App() {
-  return <DemoWorkspaceProvider><RoutedApp /></DemoWorkspaceProvider>
+  return <AuthProvider><DemoWorkspaceProvider><RoutedApp /></DemoWorkspaceProvider></AuthProvider>
 }

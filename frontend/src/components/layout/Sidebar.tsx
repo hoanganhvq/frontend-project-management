@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from 'react'
-import { useDemoWorkspace } from '../../app/DemoWorkspaceProvider'
+import { useAuth } from '../../app/AuthProvider'
+import { navigate } from '../../app/router'
 import { Icon } from '../ui/Icon'
 
 const workspaceLinks = [
@@ -15,7 +16,15 @@ const projectLinks = [
 ]
 
 export function Sidebar({ activePage, collapsed, mobileOpen, sidebarRef, onKeyDown, onNavigate, onToggle }: { activePage: string; collapsed: boolean; mobileOpen: boolean; sidebarRef: (node: HTMLElement | null) => void; onKeyDown: (event: KeyboardEvent<HTMLElement>) => void; onNavigate: (page: string) => void; onToggle: () => void }) {
-  const { workspace } = useDemoWorkspace()
+  const { user, logout } = useAuth()
+  const userName = user?.name || 'Signed-in user'
+  const userInitials = userName.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()
+
+  async function signOut() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
   const renderLink = (item: { label: string; icon: 'grid' | 'folder' | 'users' | 'sparkles' | 'timeline' | 'board' | 'settings'; disabled?: boolean }) => <button
     key={item.label}
     className={`nav-link${activePage === item.label ? ' nav-link--active' : ''}`}
@@ -36,16 +45,15 @@ export function Sidebar({ activePage, collapsed, mobileOpen, sidebarRef, onKeyDo
       <span className="brand-name">Orbit<span>AI</span></span>
       <button className="sidebar__collapse icon-button" type="button" onClick={onToggle} aria-label={mobileOpen ? 'Close navigation' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={mobileOpen ? true : !collapsed} aria-controls="main-sidebar"><Icon name={mobileOpen ? 'close' : 'chevron'} /></button>
     </div>
-    <button className="workspace-switcher" type="button" disabled aria-label="Demo workspace selector, unavailable in preview"><span className="workspace-avatar">N</span><span className="workspace-switcher__copy"><strong>Nexa Labs</strong><small>Demo workspace</small></span><Icon name="chevron" /></button>
-    <button className="sidebar-search" type="button" disabled aria-label="Quick search, unavailable in preview"><Icon name="search" /><span>Quick search</span><kbd>⌘ K</kbd></button>
-    <button className="button button--primary sidebar__create" type="button" onClick={() => onNavigate('New project')} aria-label="Create a demo project"><Icon name="plus" /><span>New project</span></button>
+    <button className="button button--primary sidebar__create" type="button" onClick={() => onNavigate('New project')} aria-label="Create a project"><Icon name="plus" /><span>New project</span></button>
     <nav className="sidebar__nav" aria-label="Main navigation">
       <p className="nav-label">Workspace</p>{workspaceLinks.map(renderLink)}
       <p className="nav-label nav-label--spaced">Current project</p>{projectLinks.map(renderLink)}
     </nav>
     <div className="sidebar__bottom">
       <div className="storage" aria-label="Illustrative demo storage use"><div><span>Demo storage</span><strong>68%</strong></div><div className="storage__track"><span /></div><small>Illustrative only</small></div>
-      <button className="profile-button" type="button" onClick={() => onNavigate('Profile')} aria-label={`Open demo profile for ${workspace.profile.name}`}><span className="profile-avatar">{workspace.profile.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join('')}</span><span className="profile-button__copy"><strong>{workspace.profile.name}</strong><small>{workspace.profile.position}</small></span><Icon name="dots" /></button>
+      <button className="profile-button" type="button" onClick={() => onNavigate('Profile')} aria-label={`Open profile for ${userName}`}><span className="profile-avatar">{user?.photo ? <img src={user.photo} alt="" /> : userInitials}</span><span className="profile-button__copy"><strong>{userName}</strong><small>{user?.position || user?.role || 'Account'}</small></span><Icon name="dots" /></button>
+      <button className="sign-out-button" type="button" onClick={() => void signOut()}><Icon name="logout" /><span>Sign out</span></button>
     </div>
   </aside>
 }

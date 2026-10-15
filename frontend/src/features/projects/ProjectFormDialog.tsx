@@ -3,8 +3,8 @@ import { Button } from '../../components/ui/Button'
 import { Dialog } from '../../components/ui/Dialog'
 import { FormField } from '../../components/ui/FormField'
 import { Input } from '../../components/ui/Input'
-import { Select } from '../../components/ui/Select'
-import type { Project, ProjectStatus } from '../../types/domain'
+import type { Project } from '../../types/domain'
+import { ErrorState } from '../../components/ui/States'
 
 export type ProjectValues = Omit<Project, 'id'>
 
@@ -12,7 +12,7 @@ type Props = {
   open: boolean
   project?: Project
   onClose: () => void
-  onSave: (project: ProjectValues) => void
+  onSave: (project: ProjectValues) => Promise<void>
 }
 
 function initialValues(project?: Project): ProjectValues {
@@ -24,9 +24,11 @@ function initialValues(project?: Project): ProjectValues {
 export function ProjectFormDialog({ open, project, onClose, onSave }: Props) {
   const [values, setValues] = useState<ProjectValues>(() => initialValues(project))
   const [dateError, setDateError] = useState('')
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (open) { setValues(initialValues(project)); setDateError('') }
+    if (open) { setValues(initialValues(project)); setDateError(''); setSaveError('') }
   }, [open, project])
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -36,10 +38,14 @@ export function ProjectFormDialog({ open, project, onClose, onSave }: Props) {
       return
     }
     setDateError('')
-    onSave({ ...values, name: values.name.trim(), description: values.description.trim() })
+    setSaving(true)
+    setSaveError('')
+    void onSave({ ...values, name: values.name.trim(), description: values.description.trim() })
+      .catch((error: unknown) => setSaveError(error instanceof Error ? error.message : 'Could not save this project.'))
+      .finally(() => setSaving(false))
   }
 
-  return <Dialog open={open} onClose={onClose} title={project ? 'Edit project' : 'Create a demo project'} description="This change is stored in this browser only.">
+  return <Dialog open={open} onClose={() => { if (!saving) onClose() }} title={project ? 'Edit project' : 'Create project'} description="Project changes are saved to the project management server.">
     <form id="project-form" className="form-grid" onSubmit={submit}>
       <FormField label="Project name" htmlFor="project-name" required><Input id="project-name" value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} required maxLength={100} autoFocus /></FormField>
       <FormField label="Description" htmlFor="project-description" hint="A short description to help identify this project."><Input id="project-description" value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} maxLength={500} /></FormField>
@@ -47,8 +53,9 @@ export function ProjectFormDialog({ open, project, onClose, onSave }: Props) {
         <FormField label="Start date" htmlFor="project-start"><Input id="project-start" type="date" value={values.startDate} onChange={(event) => setValues({ ...values, startDate: event.target.value })} /></FormField>
         <FormField label="End date" htmlFor="project-end" error={dateError}><Input id="project-end" type="date" value={values.endDate} onChange={(event) => setValues({ ...values, endDate: event.target.value })} /></FormField>
       </div>
-      <Select label="Status" id="project-status" value={values.status} onChange={(event) => setValues({ ...values, status: event.target.value as ProjectStatus })} options={[{ value: 'in_progress', label: 'In progress' }, { value: 'completed', label: 'Completed' }, { value: 'cancelled', label: 'Cancelled' }]} />
+      {project && <p className="form-field__message">Project status is shown on the details page. The current server update handler does not persist status changes.</p>}
+      {saveError && <ErrorState title="Could not save project" detail={saveError} />}
     </form>
-    <div className="dialog__actions"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" form="project-form">{project ? 'Save demo changes' : 'Create demo project'}</Button></div>
+    <div className="dialog__actions"><Button variant="secondary" disabled={saving} onClick={onClose}>Cancel</Button><Button variant="primary" disabled={saving} type="submit" form="project-form">{saving ? 'Saving…' : project ? 'Save changes' : 'Create project'}</Button></div>
   </Dialog>
 }
