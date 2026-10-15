@@ -24,11 +24,24 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, credentials: 'include' })
   if (!response.ok) {
     const details = await readError(response)
+<<<<<<< HEAD
     const payload = details && typeof details === 'object' ? details as Record<string, unknown> : null
     const detailMessage = typeof details === 'string' ? details : payload
       ? [payload.message, payload.error, payload.detail].find((value): value is string => typeof value === 'string')
       : undefined
     const message = detailMessage || `Request failed (${response.status})`
+=======
+    const bodyMessage = details && typeof details === 'object'
+      ? ['message', 'detail', 'error'].map((key) => (details as Record<string, unknown>)[key]).find((value) => typeof value === 'string')
+      : undefined
+    const message = typeof details === 'string' && details
+      ? details
+      : typeof bodyMessage === 'string' && bodyMessage
+        ? bodyMessage
+        : response.status === 401 || response.status === 403
+          ? 'You are not signed in or your session has expired.'
+          : `Request failed (${response.status})`
+>>>>>>> dcdfc6e (integrating api)
     throw new ApiError(message, response.status, details)
   }
   if (response.status === 204) return undefined as T

@@ -1,0 +1,31 @@
+.project-workspace { overflow: hidden; }
+.project-workspace__tabs { display: flex; gap: var(--space-2); padding: var(--space-2) var(--space-5) 0; border-bottom: 1px solid var(--color-line); }
+.project-workspace__tabs button { padding: var(--space-3) var(--space-2); border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--color-muted); font: inherit; font-size: var(--font-size-sm); font-weight: 650; cursor: pointer; }
+.project-workspace__tabs button.is-active { border-bottom-color: var(--color-accent); color: var(--color-accent-deep); }
+.project-workspace__body { display: grid; padding: var(--space-5); gap: var(--space-4); }
+.project-workspace__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.project-workspace__heading h2 { margin: 0; color: var(--color-ink); font-size: var(--font-size-lg); }
+.project-workspace__heading p { margin: var(--space-1) 0 0; color: var(--color-muted); font-size: var(--font-size-xs); }
+.workspace-list { display: grid; gap: var(--space-3); }
+.workspace-card { display: grid; padding: var(--space-4); gap: var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-surface); }
+.workspace-card__main,.workspace-card--compact { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.workspace-card h3 { margin: 0; color: var(--color-ink); font-size: var(--font-size-sm); }
+.workspace-card p { margin: var(--space-1) 0 0; color: var(--color-muted); font-size: var(--font-size-xs); }
+.workspace-card__meta { display: flex; flex-wrap: wrap; gap: var(--space-4); color: var(--color-muted); font-size: var(--font-size-xs); }
+.workspace-status { padding: 3px 8px; border-radius: 999px; background: var(--color-surface-muted); color: var(--color-ink-soft); font-size: var(--font-size-xs); white-space: nowrap; }
+.workspace-status--done { background: var(--color-green-soft); color: var(--color-green); }
+.workspace-status--in_progress { background: var(--color-accent-wash); color: var(--color-accent-deep); }
+.workspace-card__assignees,.workspace-card__actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.workspace-card__assignees .select-field { min-width: 13rem; }
+.workspace-person { display: inline-flex; align-items: center; padding: 4px 8px; gap: 6px; border-radius: 999px; background: var(--color-surface-muted); color: var(--color-ink-soft); font-size: var(--font-size-xs); }
+.workspace-person button { border: 0; background: none; color: var(--color-muted); cursor: pointer; font-size: 1rem; line-height: 1; }
+.workspace-card__actions { justify-content: end; }
+.workspace-card--compact { min-height: 4rem; }
+.workspace-inline-form { display: grid; grid-template-columns: minmax(10rem, 1fr) minmax(10rem, 1fr) auto; align-items: end; padding: var(--space-4); gap: var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-surface-muted); }
+.workspace-inline-form--member { grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.4fr) minmax(10rem, .8fr) auto; }
+.workspace-member { display: flex; align-items: center; gap: var(--space-3); }
+.workspace-avatar { display: grid; width: 2.5rem; height: 2.5rem; place-items: center; border-radius: 50%; background: var(--color-accent-soft); color: var(--color-accent-deep); font-size: var(--font-size-xs); font-weight: 700; }
+.workspace-task-form { display: grid; gap: var(--space-3); }
+.workspace-error { margin: 0; color: var(--color-red); font-size: var(--font-size-sm); }
+@media (max-width: 56rem) { .workspace-inline-form,.workspace-inline-form--member { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 40rem) { .project-workspace__tabs { padding-right: var(--space-3); padding-left: var(--space-3); } .project-workspace__body { padding: var(--space-3); } .workspace-inline-form,.workspace-inline-form--member { grid-template-columns: 1fr; } .workspace-card__main { align-items: flex-start; flex-direction: column; } }

@@ -1,6 +1,6 @@
 import type { ReactNode, SVGProps } from 'react'
 
-type IconName = 'grid' | 'folder' | 'users' | 'sparkles' | 'settings' | 'list' | 'timeline' | 'board' | 'search' | 'bell' | 'plus' | 'chevron' | 'arrow' | 'clock' | 'check' | 'menu' | 'close' | 'dots' | 'calendar' | 'inbox'
+type IconName = 'grid' | 'folder' | 'users' | 'sparkles' | 'settings' | 'list' | 'timeline' | 'board' | 'search' | 'bell' | 'plus' | 'chevron' | 'arrow' | 'clock' | 'check' | 'menu' | 'close' | 'dots' | 'calendar' | 'inbox' | 'logout'
 
 const paths: Record<IconName, ReactNode> = {
   grid: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
@@ -23,6 +23,7 @@ const paths: Record<IconName, ReactNode> = {
   dots: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></>,
   inbox: <><path d="M4 4h16l2 12v4H2v-4z" /><path d="M2 15h6l2 3h4l2-3h6" /></>,
+  logout: <><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /><path d="M12 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" /></>,
 }
 
 export function Icon({ name, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {

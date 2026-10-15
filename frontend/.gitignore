@@ -1,5 +1,8 @@
 node_modules
 *.log
+.env
+.env.*
+!.env.example
 
 # Output directory
 dist
@@ -9,6 +12,9 @@ dist
 stats.html
 
 .eslintcache
+<<<<<<< HEAD
 
 # env
 .env
+=======
+>>>>>>> dcdfc6e (integrating api)
