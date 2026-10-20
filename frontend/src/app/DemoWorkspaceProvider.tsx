@@ -1,19 +1,24 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
-import { DEMO_STORAGE_KEY, initialDemoWorkspace, isDemoWorkspace } from '../data/demoWorkspace'
-import type { DemoPreferences, DemoWorkspace, NotificationItem, Project, ProjectMilestone, Task, UserProfile } from '../types/domain'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { authApi, projectMembersApi, projectsApi, tasksApi } from '../api/services'
+import { ApiError } from '../api/client'
+import type { ProjectResponse, TaskResponse } from '../api/models'
+import type { DemoPreferences, DemoWorkspace, Project, ProjectMilestone, ProjectStatus, Task, UserProfile } from '../types/domain'
 
-type NewProject = Omit<Project, 'id'>
-type NewTask = Omit<Task, 'id' | 'createdAt' | 'createdByName'>
+type ProjectValues = Omit<Project, 'id'>
+type TaskValues = Omit<Task, 'id' | 'createdAt' | 'createdByName'>
+type User = { id: number; name: string; email: string; position?: string | null }
 type WorkspaceContextValue = {
   workspace: DemoWorkspace
   persistenceNotice: string | null
-  createProject: (project: NewProject) => number
-  updateProject: (id: number, changes: Omit<Partial<Project>, 'id'>) => void
-  deleteProject: (id: number) => void
-  createTask: (task: NewTask) => number
-  updateTask: (id: number, changes: Omit<Partial<Task>, 'id' | 'projectId'>) => void
+  user: User
+  refresh: () => Promise<void>
+  createProject: (project: ProjectValues) => Promise<number>
+  updateProject: (id: number, changes: Omit<Partial<Project>, 'id'>) => Promise<void>
+  deleteProject: (id: number) => Promise<void>
+  createTask: (task: TaskValues) => Promise<number>
+  updateTask: (id: number, changes: Omit<Partial<Task>, 'id' | 'projectId'>) => Promise<void>
   addMilestones: (milestones: Omit<ProjectMilestone, 'id'>[]) => void
-  deleteTask: (id: number) => void
+  deleteTask: (id: number) => Promise<void>
   markNotificationRead: (id: number) => void
   markAllNotificationsRead: () => void
   updateProfile: (profile: UserProfile) => void
@@ -22,209 +27,123 @@ type WorkspaceContextValue = {
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
+const emptyWorkspace = (user: User): DemoWorkspace => ({
+  projects: [], tasks: [], milestones: [], notifications: [],
+  profile: { name: user.name, email: user.email, position: user.position ?? 'Project member' },
+  preferences: { emailNotifications: true, weeklySummary: false },
+})
 
-function copyInitialWorkspace(): DemoWorkspace {
+function mapProject(project: ProjectResponse): Project {
+  const status: ProjectStatus = project.status === 'completed' || project.status === 'cancelled' ? project.status : 'in_progress'
+  return { id: project.id, name: project.name, description: project.description ?? '', startDate: project.startDate ?? '', endDate: project.endDate ?? '', status }
+}
+
+function mapTask(task: TaskResponse): Task {
   return {
-    ...initialDemoWorkspace,
-    projects: initialDemoWorkspace.projects.map((project) => ({ ...project })),
-    tasks: initialDemoWorkspace.tasks.map((task) => ({ ...task })),
-    milestones: initialDemoWorkspace.milestones?.map((milestone) => ({ ...milestone })) ?? [],
-    notifications: initialDemoWorkspace.notifications.map((notification) => ({ ...notification })),
-    profile: { ...initialDemoWorkspace.profile },
-    preferences: { ...initialDemoWorkspace.preferences },
+    id: task.id, projectId: task.projectId, groupId: task.groupId, parentTaskId: task.parentTaskId,
+    title: task.title, description: task.description ?? '', startDate: task.startDate ?? '', endDate: task.endDate ?? '',
+    progress: task.progress ?? 0, priority: task.priority, status: task.status,
+    boardColumn: task.status === 'done' ? 'done' : task.status === 'todo' ? 'todo' : 'in_progress',
+    createdByName: task.createdByName ?? '', createdAt: task.createdAt ?? '',
   }
 }
 
-function readWorkspace(): { workspace: DemoWorkspace; issue: string | null } {
-  try {
-    const raw = window.localStorage.getItem(DEMO_STORAGE_KEY)
-    if (!raw) return { workspace: copyInitialWorkspace(), issue: null }
-    const value: unknown = JSON.parse(raw)
-    if (isDemoWorkspace(value)) {
-      const workspace = mergeNewSeedData(value)
-      if (workspace !== value) {
-        try {
-          window.localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(workspace))
-        } catch {
-          return { workspace, issue: 'New demo sample data is loaded in this tab, but browser storage could not save the update.' }
-        }
-      }
-      return { workspace, issue: null }
-    }
-    return { workspace: copyInitialWorkspace(), issue: 'Saved demo data could not be read. A fresh demo workspace is loaded; future changes may overwrite the invalid browser copy.' }
-  } catch {
-    return { workspace: copyInitialWorkspace(), issue: 'Browser storage is unavailable. Changes will last only until this tab is closed.' }
-  }
-}
-
-function nextId(items: { id: number }[]): number {
-  return items.reduce((largest, item) => Math.max(largest, item.id), 0) + 1
-}
-
-function mergeNewSeedData(workspace: DemoWorkspace): DemoWorkspace {
-  const seedVersion = initialDemoWorkspace.demoSeedVersion ?? 1
-  if ((workspace.demoSeedVersion ?? 0) >= seedVersion) return workspace
-
-  const projectIds = new Set(workspace.projects.map((project) => project.id))
-  const seedTasks = initialDemoWorkspace.tasks.filter((task) => task.id >= 1006 && projectIds.has(task.projectId))
-  const taskIdMap = new Map<number, number>()
-  let nextTaskId = nextId(workspace.tasks)
-  for (const seedTask of seedTasks) {
-    const existing = workspace.tasks.find((task) => task.id === seedTask.id && task.projectId === seedTask.projectId && task.title === seedTask.title)
-    taskIdMap.set(seedTask.id, existing?.id ?? nextTaskId++)
-  }
-  const tasksToAdd = seedTasks.flatMap((seedTask) => {
-    const exists = workspace.tasks.some((task) => task.id === seedTask.id && task.projectId === seedTask.projectId && task.title === seedTask.title)
-    if (exists) return []
-    return [{
-      ...seedTask,
-      id: taskIdMap.get(seedTask.id)!,
-      dependencyIds: seedTask.dependencyIds?.map((id) => taskIdMap.get(id) ?? id),
-    }]
-  })
-
-  const milestones = workspace.milestones ?? []
-  const seedMilestones = (initialDemoWorkspace.milestones ?? []).filter((item) => item.id >= 7 && projectIds.has(item.projectId))
-  let nextMilestoneId = nextId(milestones)
-  const milestonesToAdd = seedMilestones.flatMap((seedMilestone) => {
-    const exists = milestones.some((item) => item.id === seedMilestone.id && item.projectId === seedMilestone.projectId && item.title === seedMilestone.title)
-    return exists ? [] : [{ ...seedMilestone, id: nextMilestoneId++ }]
-  })
-
-  return {
-    ...workspace,
-    demoSeedVersion: seedVersion,
-    tasks: [...workspace.tasks, ...tasksToAdd],
-    milestones: [...milestones, ...milestonesToAdd],
-  }
-}
-
-function appendDemoNotification(workspace: DemoWorkspace, notification: Omit<NotificationItem, 'id' | 'createdAt' | 'read'>): NotificationItem[] {
-  return [{ ...notification, id: nextId(workspace.notifications), createdAt: new Date().toISOString(), read: false }, ...workspace.notifications]
-}
-
-export function DemoWorkspaceProvider({ children }: { children: ReactNode }) {
-  const [loaded] = useState(readWorkspace)
-  const [workspace, setWorkspace] = useState(loaded.workspace)
-  const workspaceRef = useRef(loaded.workspace)
-  const [persistenceNotice, setPersistenceNotice] = useState(loaded.issue)
-
-  const commit = useCallback((update: (current: DemoWorkspace) => DemoWorkspace) => {
-    const next = update(workspaceRef.current)
-    workspaceRef.current = next
-    setWorkspace(next)
-    try {
-      window.localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(next))
-      setPersistenceNotice(null)
-    } catch {
-      setPersistenceNotice('Changes are active for this tab only because browser storage is unavailable. They are not saved to the server.')
-    }
+export function DemoWorkspaceProvider({ user, children }: { user: User; children: ReactNode }) {
+  const [workspace, setWorkspace] = useState(() => emptyWorkspace(user))
+  const [persistenceNotice, setPersistenceNotice] = useState<string | null>(null)
+  const workspaceRef = useRef(workspace)
+  const reportError = useCallback((error: unknown) => {
+    setPersistenceNotice(error instanceof ApiError && error.status === 401
+      ? 'Your session expired. Sign in again to continue.'
+      : error instanceof Error ? error.message : 'The server request could not be completed.')
   }, [])
 
-  const createProject = useCallback((project: NewProject) => {
-    const id = nextId(workspaceRef.current.projects)
-    commit((current) => ({ ...current, projects: [...current.projects, { ...project, id }] }))
-    return id
-  }, [commit])
-
-  const updateProject = useCallback((id: number, changes: Omit<Partial<Project>, 'id'>) => {
-    commit((current) => ({ ...current, projects: current.projects.map((project) => project.id === id ? { ...project, ...changes } : project) }))
-  }, [commit])
-
-  const deleteProject = useCallback((id: number) => {
-    commit((current) => {
-      const project = current.projects.find((item) => item.id === id)
-      if (!project) return current
-      return {
-        ...current,
-        projects: current.projects.filter((item) => item.id !== id),
-        tasks: current.tasks.filter((task) => task.projectId !== id),
-        milestones: (current.milestones ?? []).filter((milestone) => milestone.projectId !== id),
-        notifications: appendDemoNotification(current, { title: 'Demo project removed', detail: `${project.name} and its demo tasks were removed from this browser.`, tone: 'amber' }),
-      }
-    })
-  }, [commit])
-
-  const createTask = useCallback((task: NewTask) => {
-    const id = nextId(workspaceRef.current.tasks)
-    commit((current) => ({
-      ...current,
-      tasks: [...current.tasks, { ...task, id, createdByName: current.profile.name, createdAt: new Date().toISOString() }],
-      notifications: appendDemoNotification(current, { title: 'Demo task created', detail: `${task.title} was added to this browser’s demo workspace.`, tone: 'blue' }),
-    }))
-    return id
-  }, [commit])
-
-  const updateTask = useCallback((id: number, changes: Omit<Partial<Task>, 'id' | 'projectId'>) => {
-    commit((current) => ({ ...current, tasks: current.tasks.map((task) => {
-      if (task.id !== id) return task
-      const updated = { ...task, ...changes }
-      if (changes.boardColumn) updated.status = changes.boardColumn === 'done' ? 'done' : changes.boardColumn === 'todo' ? 'todo' : 'in_progress'
-      else if (changes.status && changes.status !== 'canceled') updated.boardColumn = changes.status === 'done' ? 'done' : changes.status
-      if (updated.status === 'done') updated.progress = 100
-      else if (task.status === 'done' && (changes.status || changes.boardColumn)) updated.progress = 0
-      return updated
-    }) }))
-  }, [commit])
-
-  const addMilestones = useCallback((milestones: Omit<ProjectMilestone, 'id'>[]) => {
-    commit((current) => {
-      let id = nextId(current.milestones ?? [])
-      return { ...current, milestones: [...(current.milestones ?? []), ...milestones.map((milestone) => ({ ...milestone, id: id++ }))] }
-    })
-  }, [commit])
-
-  const deleteTask = useCallback((id: number) => {
-    commit((current) => {
-      const task = current.tasks.find((item) => item.id === id)
-      if (!task) return current
-      return {
-        ...current,
-        tasks: current.tasks.filter((item) => item.id !== id).map((item) => ({ ...item, dependencyIds: item.dependencyIds?.filter((dependencyId) => dependencyId !== id) })),
-        notifications: appendDemoNotification(current, { title: 'Demo task removed', detail: `${task.title} was removed from this browser.`, tone: 'amber' }),
-      }
-    })
-  }, [commit])
-
-  const markNotificationRead = useCallback((id: number) => {
-    commit((current) => ({ ...current, notifications: current.notifications.map((item) => item.id === id ? { ...item, read: true } : item) }))
-  }, [commit])
-
-  const markAllNotificationsRead = useCallback(() => {
-    commit((current) => ({ ...current, notifications: current.notifications.map((item) => ({ ...item, read: true })) }))
-  }, [commit])
-
-  const updateProfile = useCallback((profile: UserProfile) => {
-    commit((current) => ({ ...current, profile }))
-  }, [commit])
-
-  const updatePreferences = useCallback((preferences: DemoPreferences) => {
-    commit((current) => ({ ...current, preferences }))
-  }, [commit])
-
-  const resetDemoWorkspace = useCallback(() => {
-    const fresh = copyInitialWorkspace()
-    workspaceRef.current = fresh
-    setWorkspace(fresh)
+  const refresh = useCallback(async () => {
     try {
-      window.localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(fresh))
+      const visible = await projectMembersApi.getVisibleProjects()
+      const loaded = await Promise.all(visible.map(async ({ id }) => projectsApi.getById(id)))
+      const projects = loaded.map(mapProject)
+      const taskLists = await Promise.all(projects.map((project) => tasksApi.getByProject(project.id)))
+      const next = { ...workspaceRef.current, projects, tasks: taskLists.flat().map(mapTask) }
+      workspaceRef.current = next
+      setWorkspace(next)
       setPersistenceNotice(null)
-    } catch {
-      setPersistenceNotice('The demo workspace reset for this tab, but browser storage is unavailable. It will reset again when this tab is reloaded.')
-    }
-  }, [])
+    } catch (error) { reportError(error) }
+  }, [reportError])
 
+  useEffect(() => { void refresh() }, [refresh])
+
+  const createProject = useCallback(async (project: ProjectValues) => {
+    try {
+      const created = await projectsApi.create({ ...project, startDate: project.startDate || null, endDate: project.endDate || null, ownerId: user.id })
+      await refresh()
+      return created.id
+    } catch (error) { reportError(error); throw error }
+  }, [user.id, refresh, reportError])
+
+  const updateProject = useCallback(async (id: number, changes: Omit<Partial<Project>, 'id'>) => {
+    const previous = workspaceRef.current.projects.find((item) => item.id === id)
+    if (!previous) return
+    try {
+      await projectsApi.update(id, {
+        name: changes.name ?? previous.name, description: changes.description ?? previous.description,
+        startDate: (changes.startDate ?? previous.startDate) || null, endDate: (changes.endDate ?? previous.endDate) || null,
+        status: changes.status ?? previous.status,
+      })
+      await refresh()
+    } catch (error) { reportError(error) }
+  }, [refresh, reportError])
+
+  const deleteProject = useCallback(async (id: number) => {
+    try { await projectsApi.delete(id); await refresh() } catch (error) { reportError(error) }
+  }, [refresh, reportError])
+
+  const createTask = useCallback(async (task: TaskValues) => {
+    try {
+      const created = await tasksApi.create({
+        projectId: task.projectId, groupId: task.groupId, parentTaskId: task.parentTaskId,
+        title: task.title, description: task.description, startDate: task.startDate || null, endDate: task.endDate || null,
+        progress: task.progress, priority: task.priority, status: task.status, createdById: user.id,
+      })
+      await refresh()
+      return created.id
+    } catch (error) { reportError(error); throw error }
+  }, [user.id, refresh, reportError])
+
+  const updateTask = useCallback(async (id: number, changes: Omit<Partial<Task>, 'id' | 'projectId'>) => {
+    const task = workspaceRef.current.tasks.find((item) => item.id === id)
+    if (!task) return
+    const status = changes.status ?? (changes.boardColumn === 'done' ? 'done' : changes.boardColumn === 'todo' ? 'todo' : changes.boardColumn ? 'in_progress' : task.status)
+    try {
+      await tasksApi.update(id, {
+        groupId: changes.groupId ?? task.groupId, parentTaskId: changes.parentTaskId ?? task.parentTaskId,
+        title: changes.title ?? task.title, description: changes.description ?? task.description,
+        startDate: (changes.startDate ?? task.startDate) || null, endDate: (changes.endDate ?? task.endDate) || null,
+        progress: changes.progress ?? (status === 'done' ? 100 : task.progress), priority: changes.priority ?? task.priority, status,
+      })
+      await refresh()
+    } catch (error) { reportError(error) }
+  }, [refresh, reportError])
+
+  const deleteTask = useCallback(async (id: number) => {
+    try { await tasksApi.delete(id); await refresh() } catch (error) { reportError(error) }
+  }, [refresh, reportError])
+  const previewOnly = useCallback(() => undefined, [])
   const value = useMemo<WorkspaceContextValue>(() => ({
-    workspace, persistenceNotice, createProject, updateProject, deleteProject,
-    createTask, updateTask, addMilestones, deleteTask, markNotificationRead, markAllNotificationsRead,
-    updateProfile, updatePreferences, resetDemoWorkspace,
-  }), [workspace, persistenceNotice, createProject, updateProject, deleteProject, createTask, updateTask, addMilestones, deleteTask, markNotificationRead, markAllNotificationsRead, updateProfile, updatePreferences, resetDemoWorkspace])
+    workspace, persistenceNotice, user, refresh, createProject, updateProject, deleteProject,
+    createTask, updateTask, deleteTask, addMilestones: previewOnly, markNotificationRead: previewOnly,
+    markAllNotificationsRead: previewOnly, updateProfile: previewOnly, updatePreferences: previewOnly, resetDemoWorkspace: previewOnly,
+  }), [workspace, persistenceNotice, user, refresh, createProject, updateProject, deleteProject, createTask, updateTask, deleteTask, previewOnly])
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }
 
-export function useDemoWorkspace(): WorkspaceContextValue {
-  const context = useContext(WorkspaceContext)
-  if (!context) throw new Error('useDemoWorkspace must be used inside DemoWorkspaceProvider')
-  return context
+export function useDemoWorkspace() {
+  const value = useContext(WorkspaceContext)
+  if (!value) throw new Error('useDemoWorkspace must be used inside DemoWorkspaceProvider')
+  return value
+}
+
+export async function getCurrentUser(): Promise<User> {
+  return authApi.me<User>()
 }

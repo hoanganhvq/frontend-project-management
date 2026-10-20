@@ -39,7 +39,7 @@ export function ProjectFormDialog({ open, project, onClose, onSave }: Props) {
     onSave({ ...values, name: values.name.trim(), description: values.description.trim() })
   }
 
-  return <Dialog open={open} onClose={onClose} title={project ? 'Edit project' : 'Create a demo project'} description="This change is stored in this browser only.">
+  return <Dialog open={open} onClose={onClose} title={project ? 'Edit project' : 'Create project'} description="This change is saved to the project server.">
     <form id="project-form" className="form-grid" onSubmit={submit}>
       <FormField label="Project name" htmlFor="project-name" required><Input id="project-name" value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} required maxLength={100} autoFocus /></FormField>
       <FormField label="Description" htmlFor="project-description" hint="A short description to help identify this project."><Input id="project-description" value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} maxLength={500} /></FormField>
@@ -49,6 +49,6 @@ export function ProjectFormDialog({ open, project, onClose, onSave }: Props) {
       </div>
       <Select label="Status" id="project-status" value={values.status} onChange={(event) => setValues({ ...values, status: event.target.value as ProjectStatus })} options={[{ value: 'in_progress', label: 'In progress' }, { value: 'completed', label: 'Completed' }, { value: 'cancelled', label: 'Cancelled' }]} />
     </form>
-    <div className="dialog__actions"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" form="project-form">{project ? 'Save demo changes' : 'Create demo project'}</Button></div>
+    <div className="dialog__actions"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" form="project-form">{project ? 'Save changes' : 'Create project'}</Button></div>
   </Dialog>
 }

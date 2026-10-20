@@ -47,8 +47,8 @@ export function TasksPage() {
   const modules = [...new Set(workspace.tasks.map((task) => task.module || 'Unassigned'))].sort()
 
   return <div className="page-stack">
-    <PageHeader eyebrow="DAILY TRACKING · DEMO" title="Task board" description="Move cards between workflow columns. Updates stay in this browser." actions={<Button variant="primary" icon={<Icon name="plus" />} onClick={() => { setCreateColumn('todo'); setCreateOpen(true) }} disabled={!workspace.projects.length}>Add demo task</Button>} />
-    <aside className="preview-notice"><span className="preview-notice__icon"><Icon name="board" /></span><p><strong>Browser demo board.</strong> Board placement and extra labels are local demo fields; backend task status values remain the verified API statuses.</p><span className="demo-label"><span />Demo data</span></aside>
+    <PageHeader eyebrow="DAILY TRACKING" title="Task board" description="Track tasks from your server workspace." actions={<Button variant="primary" icon={<Icon name="plus" />} onClick={() => { setCreateColumn('todo'); setCreateOpen(true) }} disabled={!workspace.projects.length}>Add task</Button>} />
+    <aside className="preview-notice"><span className="preview-notice__icon"><Icon name="board" /></span><p><strong>Server task data.</strong> Task changes are saved to the backend. The Review board column maps to the backend's in-progress status.</p><span className="demo-label"><span />API</span></aside>
     <div className="page-toolbar task-board-filters" aria-label="Task filters">
       <Input id="task-search" leadingIcon={<Icon name="search" />} placeholder="Search tasks" aria-label="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} />
       <Select id="task-filter-project" label="Project" value={projectId} onChange={(event) => setProjectId(event.target.value)} options={[{ value: 'all', label: 'All projects' }, ...workspace.projects.map((project) => ({ value: String(project.id), label: project.name }))]} />
@@ -81,7 +81,7 @@ export function TasksPage() {
       })}
     </div>
     <p className="board-canceled-note">Canceled tasks are hidden from the four active board columns. Due-soon and overdue labels are calculated from task dates only.</p>
-    <TaskFormDialog open={createOpen || !!editTask} projectId={Number(projectId) || workspace.projects[0]?.id || 0} initialBoardColumn={createColumn} task={editTask} onClose={() => { setCreateOpen(false); setEditTask(undefined) }} onSave={(values) => { if (editTask) { const { projectId: _id, ...changes } = values; updateTask(editTask.id, changes) } else createTask(values); setCreateOpen(false); setEditTask(undefined) }} />
+    <TaskFormDialog open={createOpen || !!editTask} projectId={Number(projectId) || workspace.projects[0]?.id || 0} initialBoardColumn={createColumn} task={editTask} onClose={() => { setCreateOpen(false); setEditTask(undefined) }} onSave={(values) => { if (editTask) { const { projectId: _id, ...changes } = values; void updateTask(editTask.id, changes); setCreateOpen(false); setEditTask(undefined) } else { void createTask(values).then(() => { setCreateOpen(false); setEditTask(undefined) }).catch(() => {}) } }} />
   </div>
 }
 
@@ -89,13 +89,13 @@ export function TaskDetailPage({ id }: { id: number }) {
   const { workspace, updateTask, deleteTask } = useDemoWorkspace()
   const task = workspace.tasks.find((item) => item.id === id)
   const [editing, setEditing] = useState(false)
-  if (!task) return <div className="page-stack"><PageHeader title="Task not found" description="This task is not present in the browser demo workspace." /><Button onClick={() => navigate('/tasks')}>Back to tasks</Button></div>
+  if (!task) return <div className="page-stack"><PageHeader title="Task not found" description="This task is not in your loaded server workspace." /><Button onClick={() => navigate('/tasks')}>Back to tasks</Button></div>
   const project = workspace.projects.find((item) => item.id === task.projectId)
   return <div className="page-stack"><div className="back-link-row"><Button variant="ghost" size="sm" onClick={() => navigate('/tasks')}>← All tasks</Button></div>
-    <PageHeader eyebrow="TASK DETAILS · DEMO" title={task.title} description={task.description || 'No description has been added.'} actions={<div className="page-actions"><Button variant="secondary" onClick={() => setEditing(true)}>Edit task</Button><Button variant="danger" onClick={() => { deleteTask(id); navigate('/tasks') }}>Delete demo task</Button></div>} />
+    <PageHeader eyebrow="TASK DETAILS" title={task.title} description={task.description || 'No description has been added.'} actions={<div className="page-actions"><Button variant="secondary" onClick={() => setEditing(true)}>Edit task</Button><Button variant="danger" onClick={() => { void deleteTask(id); navigate('/tasks') }}>Delete task</Button></div>} />
     <section className="content-panel detail-card"><div className="detail-summary"><div><span>Project</span><strong>{project?.name ?? 'Project unavailable'}</strong></div><div><span>Status</span><StatusBadge tone={taskTone(task.status)}>{taskStatusLabel(task.status)}</StatusBadge></div><div><span>Priority</span><StatusBadge tone={priorityTone(task.priority)}>{task.priority}</StatusBadge></div><div><span>Due date</span><strong>{formatDate(task.endDate)}</strong></div><div><span>Assignee · demo</span><strong>{task.assigneeName || 'Unassigned'}</strong></div><div><span>Module · demo</span><strong>{task.module || 'Unassigned'}</strong></div><div><span>Estimate · demo</span><strong>{task.estimateHours == null ? 'Not estimated' : `${task.estimateHours} hours`}</strong></div><div><span>Progress</span><strong>{task.progress}% · demo value</strong></div><div><span>Created by</span><strong>{task.createdByName}</strong></div></div>
-      <div className="task-dependencies"><h2>Dependencies <span>Demo data</span></h2>{task.dependencyIds?.length ? <ul>{task.dependencyIds.map((dependencyId) => { const dependency = workspace.tasks.find((item) => item.id === dependencyId); return <li key={dependencyId}>{dependency ? <button type="button" className="table-link" onClick={() => navigate(`/tasks/${dependencyId}`)}>{dependency.title}</button> : <span>Task {dependencyId} unavailable</span>}</li> })}</ul> : <p>No dependencies recorded for this demo task.</p>}</div>
+      <div className="task-dependencies"><h2>Dependencies</h2><p>Task dependencies are supported by the backend but are not currently displayed in this view.</p></div>
     </section>
-    <TaskFormDialog open={editing} projectId={task.projectId} task={task} onClose={() => setEditing(false)} onSave={(values) => { const { projectId: _projectId, ...changes } = values; updateTask(id, changes); setEditing(false) }} />
+    <TaskFormDialog open={editing} projectId={task.projectId} task={task} onClose={() => setEditing(false)} onSave={(values) => { const { projectId: _projectId, ...changes } = values; void updateTask(id, changes); setEditing(false) }} />
   </div>
 }

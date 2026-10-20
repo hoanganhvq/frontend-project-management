@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { projectMembersApi } from '../../api/services'
+import { isApiError } from '../../api/client'
 import type { ProjectMember, ProjectMemberCandidate, ProjectMemberProject } from '../../api/models'
 import { Button } from '../../components/ui/Button'
 import { Dialog } from '../../components/ui/Dialog'
@@ -9,16 +10,20 @@ import { Input } from '../../components/ui/Input'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Select } from '../../components/ui/Select'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { ProjectGroupsPanel, type ProjectGroupData } from './ProjectGroupsPanel'
 import './TeamMembersPage.css'
 
 type RoleFilter = 'all' | 'OWNER' | 'LEADER' | 'MEMBER'
 type ProjectRole = 'LEADER' | 'MEMBER'
+type GroupFilter = number | 'all'
 
 function initials(name: string): string {
   return name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()
 }
 
 function errorMessage(error: unknown): string {
+  if (isApiError(error) && error.status === 401) return 'Your session has expired or you are not signed in. Sign in, then try again.'
+  if (isApiError(error) && error.status === 403) return 'Your account does not have permission to access or change this project roster.'
   return error instanceof Error ? error.message : 'The request could not be completed. Please try again.'
 }
 
@@ -29,15 +34,22 @@ function formatJoinedAt(value: string | null): string {
 }
 
 export function TeamMembersPage() {
+  const [requestedProjectName] = useState(() => new URLSearchParams(window.location.search).get('projectName')?.trim() ?? '')
   const [projects, setProjects] = useState<ProjectMemberProject[]>([])
-  const [projectId, setProjectId] = useState<number | ''>('')
+  const [projectId, setProjectId] = useState<number | ''>(() => {
+    const value = Number(new URLSearchParams(window.location.search).get('projectId'))
+    return Number.isSafeInteger(value) && value > 0 ? value : ''
+  })
   const [members, setMembers] = useState<ProjectMember[]>([])
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>('all')
+  const [groupData, setGroupData] = useState<ProjectGroupData>({ groups: [], membersByGroup: {} })
   const [loadingProjects, setLoadingProjects] = useState(true)
   const [loadingMembers, setLoadingMembers] = useState(false)
   const [memberReload, setMemberReload] = useState(0)
   const [pageError, setPageError] = useState('')
+  const [projectSelectionNotice, setProjectSelectionNotice] = useState('')
   const [operationError, setOperationError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
@@ -54,6 +66,10 @@ export function TeamMembersPage() {
   const [removeMember, setRemoveMember] = useState<ProjectMember | null>(null)
 
   const selectedProject = projects.find((project) => project.id === projectId) ?? null
+  const acceptGroupData = useCallback((data: ProjectGroupData) => {
+    setGroupData(data)
+    setGroupFilter((current) => current === 'all' || data.groups.some((group) => group.id === current) ? current : 'all')
+  }, [])
 
   async function loadProjects() {
     setLoadingProjects(true)
@@ -61,7 +77,20 @@ export function TeamMembersPage() {
     try {
       const result = await projectMembersApi.getVisibleProjects()
       setProjects(result)
-      setProjectId((current) => result.some((project) => project.id === current) ? current : (result[0]?.id ?? ''))
+      const requestedId = Number(new URLSearchParams(window.location.search).get('projectId'))
+      const requestedById = Number.isSafeInteger(requestedId) && requestedId > 0
+      const requestedMatches = requestedProjectName ? result.filter((project) => project.name.toLocaleLowerCase() === requestedProjectName.toLocaleLowerCase()) : []
+      const requestedSelection = requestedById
+        ? result.find((project) => project.id === requestedId)?.id ?? ''
+        : requestedProjectName && requestedMatches.length === 1 ? requestedMatches[0].id : ''
+      setProjectSelectionNotice(requestedById && requestedSelection === ''
+        ? 'That project is not in your accessible server project list.'
+        : requestedProjectName && requestedMatches.length === 0
+          ? `No server project named “${requestedProjectName}” is available. Choose the matching server project if it has a different name.`
+          : requestedProjectName && requestedMatches.length > 1
+            ? 'More than one server project has this name. Select the correct project below.'
+            : '')
+      setProjectId((current) => result.some((project) => project.id === current) ? current : requestedSelection || (requestedProjectName || requestedById ? '' : result[0]?.id ?? ''))
     } catch (error) {
       setPageError(errorMessage(error))
     } finally {
@@ -74,7 +103,7 @@ export function TeamMembersPage() {
   useEffect(() => {
     setMembers([])
     setPageError('')
-    if (projectId === '') return
+    if (projectId === '') { setLoadingMembers(false); return }
     let active = true
     setLoadingMembers(true)
     projectMembersApi.getByProject(projectId).then((result) => {
@@ -109,9 +138,10 @@ export function TeamMembersPage() {
     const needle = query.trim().toLocaleLowerCase()
     return members.filter((member) =>
       (roleFilter === 'all' || member.roleName === roleFilter)
+      && (groupFilter === 'all' || (groupData.membersByGroup[groupFilter] ?? []).some((groupMember) => groupMember.memberId === member.userId))
       && (!needle || member.userName.toLocaleLowerCase().includes(needle) || member.email.toLocaleLowerCase().includes(needle)),
     )
-  }, [members, query, roleFilter])
+  }, [members, query, roleFilter, groupFilter, groupData.membersByGroup])
 
   function showSuccess(message: string) {
     setNotice(message)
@@ -176,7 +206,7 @@ export function TeamMembersPage() {
 
     <aside className="team-members-notice" role="note">
       <span className="team-members-notice__icon"><Icon name="users" /></span>
-      <div><strong>Project members · live API data</strong><p>The owner is read from the project record; other people come from project membership records. User accounts, group membership, and task assignees remain separate. Changes are sent to the backend; other workspace pages may still use browser demo data.</p></div>
+      <div><strong>Project members · live API data</strong><p>The owner is read from the project record; other people come from project membership records. User accounts, group membership, and task assignees remain separate. Roster and group changes are sent to the backend.</p></div>
       <StatusBadge tone="green">Server data</StatusBadge>
     </aside>
 
@@ -186,20 +216,23 @@ export function TeamMembersPage() {
           : <>
             <section className="team-members-panel content-panel" aria-label="Project member directory">
               <div className="team-members-toolbar">
-                <div className="team-members-project-picker"><label htmlFor="team-project">Project</label><Select id="team-project" aria-label="Select project" value={String(projectId)} disabled={busy} onChange={(event) => { setProjectId(Number(event.target.value)); setNewRole('MEMBER') }} options={projects.map((project) => ({ value: String(project.id), label: project.name }))} /></div>
-                <div className="team-members-count"><strong>{members.length}</strong><span>{members.length === 1 ? 'person' : 'people'} in this project</span></div>
+                <div className="team-members-project-picker"><label htmlFor="team-project">Project</label><Select id="team-project" aria-label="Select project" value={String(projectId)} disabled={busy} onChange={(event) => { setProjectId(event.target.value ? Number(event.target.value) : ''); setProjectSelectionNotice(''); setNewRole('MEMBER') }} options={[{ value: '', label: 'Choose a project' }, ...projects.map((project) => ({ value: String(project.id), label: project.name }))]} /></div>
+                <div className="team-members-count"><strong>{selectedProject ? members.length : 0}</strong><span>{members.length === 1 ? 'person' : 'people'} in this project</span></div>
               </div>
 
               <div className="team-members-filters">
                 <Input id="team-member-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name or email" aria-label="Search project members by name or email" leadingIcon={<Icon name="search" />} />
                 <Select id="team-role-filter" aria-label="Filter by project role" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as RoleFilter)} options={[{ value: 'all', label: 'All project roles' }, { value: 'OWNER', label: 'Owner' }, { value: 'LEADER', label: 'Leader' }, { value: 'MEMBER', label: 'Member' }]} />
+                {groupData.groups.length > 0 && <Select id="team-group-filter" aria-label="Filter by team or module" value={String(groupFilter)} onChange={(event) => setGroupFilter(event.target.value === 'all' ? 'all' : Number(event.target.value))} options={[{ value: 'all', label: 'All teams and modules' }, ...groupData.groups.map((group) => ({ value: String(group.id), label: group.name }))]} />}
               </div>
 
               {notice && <div className="team-members-feedback team-members-feedback--success" role="status"><Icon name="check" />{notice}</div>}
               {operationError && <div className="team-members-feedback team-members-feedback--error" role="alert">{operationError}</div>}
+              {projectSelectionNotice && <div className="team-members-feedback" role="status">{projectSelectionNotice}</div>}
               {pageError ? <ErrorState title="Could not load project members" detail={pageError} action={<Button onClick={() => setMemberReload((value) => value + 1)}>Try again</Button>} />
                 : loadingMembers ? <LoadingState label="Loading project members…" />
-                  : members.length === 0 ? <EmptyState title="No member records yet" detail="This project has no rows in its project membership list. Its owner is shown when the backend returns a roster." action={selectedProject?.canManageMembers ? <Button variant="primary" onClick={() => setAddOpen(true)}><Icon name="plus" /> Add the first member</Button> : undefined} />
+                  : projectId === '' ? <EmptyState title="Choose a server project" detail="Select a project to view its live member roster." />
+                    : members.length === 0 ? <EmptyState title="No member records yet" detail="This project has no member records yet." action={selectedProject?.canManageMembers ? <Button variant="primary" onClick={() => setAddOpen(true)}><Icon name="plus" /> Add the first member</Button> : undefined} />
                     : filteredMembers.length === 0 ? <EmptyState title="No matching members" detail="Try a different name, email, or project role filter." />
                       : <div className="team-member-list">{filteredMembers.map((member) => {
                         const editable = selectedProject?.canManageMembers && !member.projectOwner && member.id !== null
@@ -216,6 +249,7 @@ export function TeamMembersPage() {
                         </article>
                       })}</div>}
             </section>
+            {selectedProject && <ProjectGroupsPanel projectId={selectedProject.id} projectName={selectedProject.name} projectMembers={members} canManage={selectedProject.canManageMembers} onGroupData={acceptGroupData} />}
             <p className="team-members-permission-note">{selectedProject?.canManageMembers ? 'You can manage this project roster. The server checks your owner or LEADER permission on every change.' : 'You can view this roster. Only the project owner or a LEADER can change membership.'}</p>
           </>}
 

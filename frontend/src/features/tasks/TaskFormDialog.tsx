@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { groupsApi } from '../../api/services'
+import type { ProjectGroup } from '../../api/models'
 import { Button } from '../../components/ui/Button'
 import { Dialog } from '../../components/ui/Dialog'
 import { FormField } from '../../components/ui/FormField'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
-import { useDemoWorkspace } from '../../app/DemoWorkspaceProvider'
 import type { Task, TaskBoardColumn, TaskPriority, TaskStatus } from '../../types/domain'
 
 export type TaskValues = Omit<Task, 'id' | 'createdAt' | 'createdByName'>
@@ -25,13 +26,20 @@ function initialValues(projectId: number, task?: Task, initialBoardColumn: TaskB
 }
 
 export function TaskFormDialog({ open, projectId, task, initialBoardColumn, onClose, onSave }: Props) {
-  const { workspace } = useDemoWorkspace()
+  const [groups, setGroups] = useState<ProjectGroup[]>([])
   const [values, setValues] = useState<TaskValues>(() => initialValues(projectId, task, initialBoardColumn))
   const [dateError, setDateError] = useState('')
 
   useEffect(() => {
     if (open) { setValues(initialValues(projectId, task, initialBoardColumn)); setDateError('') }
   }, [open, projectId, task, initialBoardColumn])
+
+  useEffect(() => {
+    if (!open || !projectId) { setGroups([]); return }
+    let active = true
+    groupsApi.getByProject(projectId).then((result) => { if (active) setGroups(result) }).catch(() => { if (active) setGroups([]) })
+    return () => { active = false }
+  }, [open, projectId])
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -43,7 +51,7 @@ export function TaskFormDialog({ open, projectId, task, initialBoardColumn, onCl
     onSave({ ...values, title: values.title.trim(), description: values.description.trim() })
   }
 
-  return <Dialog open={open} onClose={onClose} title={task ? 'Edit task' : 'Create a demo task'} description="This change is stored in this browser only.">
+  return <Dialog open={open} onClose={onClose} title={task ? 'Edit task' : 'Create task'} description="This change is saved to the project server.">
     <form id="task-form" className="form-grid" onSubmit={submit}>
       <FormField label="Task title" htmlFor="task-title" required><Input id="task-title" value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} required maxLength={120} autoFocus /></FormField>
       <FormField label="Description" htmlFor="task-description"><Input id="task-description" value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} maxLength={1000} /></FormField>
@@ -52,20 +60,15 @@ export function TaskFormDialog({ open, projectId, task, initialBoardColumn, onCl
         <FormField label="Due date" htmlFor="task-end" error={dateError}><Input id="task-end" type="date" value={values.endDate} onChange={(event) => setValues({ ...values, endDate: event.target.value })} /></FormField>
       </div>
       <div className="form-grid__two">
-        <FormField label="Assignee" htmlFor="task-assignee" hint="Demo field; the current task API does not expose assignment."><Input id="task-assignee" value={values.assigneeName ?? ''} onChange={(event) => setValues({ ...values, assigneeName: event.target.value })} maxLength={100} /></FormField>
-        <FormField label="Module" htmlFor="task-module" hint="Demo planning label."><Input id="task-module" value={values.module ?? ''} onChange={(event) => setValues({ ...values, module: event.target.value })} maxLength={100} /></FormField>
+        <Select id="task-group" label="Project group" value={values.groupId == null ? '' : String(values.groupId)} onChange={(event) => setValues({ ...values, groupId: event.target.value ? Number(event.target.value) : null })} options={[{ value: '', label: 'No group' }, ...groups.map((group) => ({ value: String(group.id), label: group.name }))]} />
+        <span className="form-field__message">Choose a group in this project, or leave the task ungrouped.</span>
       </div>
-      <div className="form-grid__two">
-        <FormField label="Estimate (hours)" htmlFor="task-estimate" hint="Illustrative estimate only."><Input id="task-estimate" type="number" min={0} max={10000} step="0.5" value={values.estimateHours ?? ''} onChange={(event) => setValues({ ...values, estimateHours: event.target.value ? Number(event.target.value) : undefined })} /></FormField>
-        <Select id="task-dependencies" label="Dependencies" multiple value={(values.dependencyIds ?? []).map(String)} onChange={(event) => setValues({ ...values, dependencyIds: Array.from(event.target.selectedOptions, (option) => Number(option.value)) })} options={workspace.tasks.filter((candidate) => candidate.projectId === projectId && candidate.id !== task?.id).map((candidate) => ({ value: String(candidate.id), label: candidate.title }))} aria-describedby="task-dependencies-help" />
-      </div>
-      <span id="task-dependencies-help" className="form-field__message">Optional demo dependencies. Hold Ctrl (Windows) or Command (Mac) to select more than one.</span>
       <div className="form-grid__two">
         <Select label="Status" id="task-status" value={values.status} onChange={(event) => { const status = event.target.value as TaskStatus; setValues({ ...values, status, boardColumn: status === 'todo' ? 'todo' : status === 'done' ? 'done' : status === 'in_progress' ? 'in_progress' : undefined }) }} options={[{ value: 'todo', label: 'To do' }, { value: 'in_progress', label: 'In progress' }, { value: 'done', label: 'Done' }, { value: 'canceled', label: 'Canceled' }]} />
         <Select label="Priority" id="task-priority" value={values.priority} onChange={(event) => setValues({ ...values, priority: event.target.value as TaskPriority })} options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]} />
       </div>
-      <FormField label="Progress" htmlFor="task-progress" hint="Demo progress percentage (0–100)."><Input id="task-progress" type="number" min={0} max={100} value={values.progress} onChange={(event) => setValues({ ...values, progress: Number(event.target.value) })} /></FormField>
+      <FormField label="Progress" htmlFor="task-progress" hint="Percentage complete (0–100)."><Input id="task-progress" type="number" min={0} max={100} value={values.progress} onChange={(event) => setValues({ ...values, progress: Number(event.target.value) })} /></FormField>
     </form>
-    <div className="dialog__actions"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" form="task-form">{task ? 'Save demo changes' : 'Create demo task'}</Button></div>
+    <div className="dialog__actions"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" form="task-form">{task ? 'Save changes' : 'Create task'}</Button></div>
   </Dialog>
 }
