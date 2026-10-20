@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 
 export type AppRoute =
   | { page: 'login' }
+  | { page: 'register' }
   | { page: 'dashboard' }
   | { page: 'projects'; create?: boolean }
   | { page: 'team-members' }
@@ -35,6 +36,7 @@ function currentPath() {
 export function parseRoute(path: string): AppRoute {
   const [pathname, search = ''] = path.split('?')
   if (pathname === '/login') return { page: 'login' }
+  if (pathname === '/register') return { page: 'register' }
   if (pathname === '/' || pathname === '/dashboard') return { page: 'dashboard' }
   if (pathname === '/projects') return { page: 'projects', create: new URLSearchParams(search).get('create') === '1' }
   if (pathname === '/team-members') return { page: 'team-members' }
@@ -49,6 +51,13 @@ export function parseRoute(path: string): AppRoute {
   const taskMatch = pathname.match(/^\/tasks\/(\d+)$/)
   if (taskMatch) return { page: 'task-detail', id: Number(taskMatch[1]) }
   return { page: 'not-found' }
+}
+
+export function safeRedirectPath(candidate: string | null): string | null {
+  if (!candidate?.startsWith('/') || candidate.startsWith('//')) return null
+  const destination = parseRoute(candidate)
+  if (destination.page === 'login' || destination.page === 'register' || destination.page === 'not-found') return null
+  return candidate
 }
 
 export function navigate(path: string, options: { replace?: boolean } = {}) {

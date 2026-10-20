@@ -10,6 +10,7 @@ import { Select } from '../../components/ui/Select'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { toLocalDateInput } from '../../lib/format'
 import { documentAnalysisService, type DocumentPlanProposal, type GeneratedTaskProposal, type AnalysisProgress } from './analysisService'
+import './AIPlannerPage.css'
 
 type PlannerStep = 1 | 2 | 3 | 4 | 5
 

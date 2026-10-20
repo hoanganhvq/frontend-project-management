@@ -11,6 +11,7 @@ export class ApiError extends Error {
 }
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+const inFlightGets = new Map<string, Promise<unknown>>()
 
 async function readError(response: Response): Promise<unknown> {
   const contentType = response.headers.get('content-type') ?? ''
@@ -18,36 +19,45 @@ async function readError(response: Response): Promise<unknown> {
   return response.text().catch(() => '')
 }
 
-export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function executeRequest<T>(path: string, init: RequestInit): Promise<T> {
   const headers = new Headers(init.headers)
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, credentials: 'include' })
   if (!response.ok) {
     const details = await readError(response)
-<<<<<<< HEAD
     const payload = details && typeof details === 'object' ? details as Record<string, unknown> : null
     const detailMessage = typeof details === 'string' ? details : payload
       ? [payload.message, payload.error, payload.detail].find((value): value is string => typeof value === 'string')
       : undefined
-    const message = detailMessage || `Request failed (${response.status})`
-=======
-    const bodyMessage = details && typeof details === 'object'
-      ? ['message', 'detail', 'error'].map((key) => (details as Record<string, unknown>)[key]).find((value) => typeof value === 'string')
-      : undefined
-    const message = typeof details === 'string' && details
-      ? details
-      : typeof bodyMessage === 'string' && bodyMessage
-        ? bodyMessage
-        : response.status === 401 || response.status === 403
-          ? 'You are not signed in or your session has expired.'
-          : `Request failed (${response.status})`
->>>>>>> dcdfc6e (integrating api)
-    throw new ApiError(message, response.status, details)
+    const message = response.status >= 500
+      ? 'The service could not complete this request. Please try again.'
+      : response.status === 403
+        ? 'Your account does not have permission for this action.'
+        : detailMessage || (response.status === 401
+          ? 'You are not signed in or your account does not have permission for this action.'
+          : `Request failed (${response.status})`)
+    throw new ApiError(message, response.status, response.status === 403 || response.status >= 500 ? undefined : details)
   }
   if (response.status === 204) return undefined as T
   const contentType = response.headers.get('content-type') ?? ''
   if (contentType.includes('application/json')) return response.json() as Promise<T>
   return response.text() as Promise<T>
+}
+
+export function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method ?? 'GET').toUpperCase()
+  if (method !== 'GET') return executeRequest<T>(path, init)
+
+  const key = `${API_BASE_URL}${path}`
+  const existing = inFlightGets.get(key)
+  if (existing) return existing as Promise<T>
+
+  const request = executeRequest<T>(path, init)
+  inFlightGets.set(key, request)
+  void request.finally(() => {
+    if (inFlightGets.get(key) === request) inFlightGets.delete(key)
+  }).catch(() => undefined)
+  return request
 }
 
 export function isApiError(error: unknown): error is ApiError {

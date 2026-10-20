@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { ApproveScheduleRequest, ApproveScheduleResponse, GroupMember, LoginRequest, ProjectGroup, ProjectGroupRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskRequest, TaskResponse, TaskUpdateRequest } from './models'
+import type { ApproveScheduleRequest, ApproveScheduleResponse, GroupMember, LoginRequest, ProjectGroup, ProjectGroupRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskAssignee, TaskRequest, TaskResponse, TaskUpdateRequest, UserResponse } from './models'
 
 export const authApi = {
   login: (body: LoginRequest) => apiRequest<string>('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
@@ -9,11 +9,11 @@ export const authApi = {
 }
 
 export const projectsApi = {
+  getAll: () => apiRequest<ProjectResponse[]>('/api/projects'),
   create: (body: ProjectRequest) => apiRequest<ProjectResponse>('/api/projects', { method: 'POST', body: JSON.stringify(body) }),
   getById: (id: number) => apiRequest<ProjectResponse>(`/api/projects/${id}`),
   update: (id: number, body: ProjectUpdateRequest) => apiRequest<ProjectResponse>(`/api/projects/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id: number) => apiRequest<ProjectResponse>(`/api/projects/${id}`, { method: 'DELETE' }),
-  // The current backend has no project collection/list endpoint.
 }
 
 export const projectMembersApi = {
@@ -38,12 +38,19 @@ export const groupMembersApi = {
   remove: (groupId: number, userId: number) => apiRequest<GroupMember>(`/api/groupmember?groupId=${groupId}&userId=${userId}`, { method: 'DELETE' }),
 }
 
+export const usersApi = {
+  search: (keyword: string) => apiRequest<UserResponse[]>(`/api/users/search?keyword=${encodeURIComponent(keyword)}`),
+}
+
 export const tasksApi = {
   create: (body: TaskRequest) => apiRequest<TaskResponse>('/api/tasks', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: TaskUpdateRequest) => apiRequest<TaskResponse>(`/api/tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   getById: (id: number) => apiRequest<TaskResponse>(`/api/tasks/${id}`),
   getByProject: (projectId: number) => apiRequest<TaskResponse[]>(`/api/tasks/project/${projectId}`),
   delete: (id: number) => apiRequest<string>(`/api/tasks/${id}`, { method: 'DELETE' }),
+  getAssignees: (taskId: number) => apiRequest<TaskAssignee[]>(`/api/tasks/${taskId}/assignees`),
+  assign: (taskId: number, userId: number) => apiRequest<TaskAssignee>(`/api/tasks/assignments?taskId=${taskId}&userId=${userId}`, { method: 'POST' }),
+  unassign: (taskId: number, userId: number) => apiRequest<TaskAssignee>(`/api/tasks/assignments?taskId=${taskId}&userId=${userId}`, { method: 'DELETE' }),
 }
 
 export const aiSchedulesApi = {

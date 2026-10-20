@@ -1,22 +1,29 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { authApi } from '../api/services'
 import { ApiError } from '../api/client'
-import type { LoginRequest, UserResponse } from '../api/models'
+import type { LoginRequest, RegisterRequest, UserResponse } from '../api/models'
 
 type AuthStatus = 'loading' | 'ready' | 'unavailable'
 type AuthContextValue = {
   user: UserResponse | null
   status: AuthStatus
   error: string
+  registrationSucceeded: boolean
   login: (credentials: LoginRequest) => Promise<void>
+  register: (details: RegisterRequest) => Promise<void>
+  clearRegistrationNotice: () => void
   logout: () => Promise<void>
+  expireSession: () => void
   refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
+  if (error instanceof ApiError) {
+    if (error.status >= 500) return 'The authentication service could not restore your session. Please retry.'
+    return error.message
+  }
   return 'Unable to connect to the authentication service.'
 }
 
@@ -24,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserResponse | null>(null)
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [error, setError] = useState('')
+  const [registrationSucceeded, setRegistrationSucceeded] = useState(false)
 
   const refresh = useCallback(async () => {
     setStatus('loading')
@@ -53,6 +61,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('ready')
   }, [])
 
+  const register = useCallback(async (details: RegisterRequest) => {
+    setRegistrationSucceeded(false)
+    await authApi.register(details)
+    setRegistrationSucceeded(true)
+  }, [])
+
+  const clearRegistrationNotice = useCallback(() => setRegistrationSucceeded(false), [])
+
+  const expireSession = useCallback(() => {
+    setUser(null)
+    setStatus('ready')
+    setError('')
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout()
@@ -62,10 +84,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
       setStatus('ready')
       setError('')
+      setRegistrationSucceeded(false)
     }
   }, [])
 
-  const value = useMemo(() => ({ user, status, error, login, logout, refresh }), [user, status, error, login, logout, refresh])
+  const value = useMemo(() => ({ user, status, error, registrationSucceeded, login, register, clearRegistrationNotice, logout, expireSession, refresh }), [user, status, error, registrationSucceeded, login, register, clearRegistrationNotice, logout, expireSession, refresh])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { authApi, projectMembersApi, projectsApi, tasksApi } from '../api/services'
 import { ApiError } from '../api/client'
+import { useAuth } from './AuthProvider'
 import type { ProjectResponse, TaskResponse } from '../api/models'
 import type { DemoPreferences, DemoWorkspace, Project, ProjectMilestone, ProjectStatus, Task, UserProfile } from '../types/domain'
 
@@ -49,14 +50,23 @@ function mapTask(task: TaskResponse): Task {
 }
 
 export function DemoWorkspaceProvider({ user, children }: { user: User; children: ReactNode }) {
+  const { expireSession } = useAuth()
   const [workspace, setWorkspace] = useState(() => emptyWorkspace(user))
   const [persistenceNotice, setPersistenceNotice] = useState<string | null>(null)
   const workspaceRef = useRef(workspace)
   const reportError = useCallback((error: unknown) => {
-    setPersistenceNotice(error instanceof ApiError && error.status === 401
-      ? 'Your session expired. Sign in again to continue.'
-      : error instanceof Error ? error.message : 'The server request could not be completed.')
-  }, [])
+    if (error instanceof ApiError && error.status === 401) {
+      setPersistenceNotice('Your session expired. Sign in again to continue.')
+      expireSession()
+      return
+    }
+    setPersistenceNotice(error instanceof ApiError && error.status >= 500
+        ? 'The project service could not complete that request. Please try again shortly.'
+        : error instanceof ApiError && error.status === 403
+          ? 'Your account does not have permission to change this project.'
+          : error instanceof ApiError ? error.message
+            : 'The server request could not be completed.')
+  }, [expireSession])
 
   const refresh = useCallback(async () => {
     try {

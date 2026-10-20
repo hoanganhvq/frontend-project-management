@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { groupsApi, projectMembersApi, rolesApi, tasksApi, usersApi } from '../../api/services'
-import type { GroupRequest, GroupResponse, ProjectMember, RoleResponse, TaskAssignee, TaskResponse } from '../../api/models'
+import { groupsApi, projectMembersApi, tasksApi, usersApi } from '../../api/services'
+import type { ProjectGroup, ProjectMember, TaskAssignee, TaskResponse } from '../../api/models'
 import { useAuth } from '../../app/AuthProvider'
 import { Button } from '../../components/ui/Button'
 import { Dialog } from '../../components/ui/Dialog'
@@ -20,9 +20,8 @@ export function ProjectWorkspace({ projectId }: { projectId: number }) {
   const { user } = useAuth()
   const [tab, setTab] = useState<Tab>('tasks')
   const [tasks, setTasks] = useState<TaskResponse[]>([])
-  const [groups, setGroups] = useState<GroupResponse[]>([])
+  const [groups, setGroups] = useState<ProjectGroup[]>([])
   const [members, setMembers] = useState<ProjectMember[]>([])
-  const [roles, setRoles] = useState<RoleResponse[]>([])
   const [assignees, setAssignees] = useState<Record<number, TaskAssignee[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -43,10 +42,10 @@ export function ProjectWorkspace({ projectId }: { projectId: number }) {
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const [taskRows, groupRows, memberRows, roleRows] = await Promise.all([
-        tasksApi.getByProject(projectId), groupsApi.getByProject(projectId), projectMembersApi.getByProject(projectId), rolesApi.getAll(),
+      const [taskRows, groupRows, memberRows] = await Promise.all([
+        tasksApi.getByProject(projectId), groupsApi.getByProject(projectId), projectMembersApi.getByProject(projectId),
       ])
-      setTasks(taskRows); setGroups(groupRows); setMembers(memberRows); setRoles(roleRows)
+      setTasks(taskRows); setGroups(groupRows); setMembers(memberRows)
       // Show the project workspace as soon as its primary data is ready.
       // Assignee details are separate requests per task, so load them in the background.
       setLoading(false)
@@ -91,14 +90,14 @@ export function ProjectWorkspace({ projectId }: { projectId: number }) {
   async function addGroup(event: FormEvent) {
     event.preventDefault(); if (!groupName.trim()) return
     setBusy(true); setGroupError('')
-    try { const body: GroupRequest = { projectId, name: groupName.trim(), description: groupDescription.trim() }; await groupsApi.create(body); setGroupName(''); setGroupDescription(''); await load() }
+    try { const body = { projectId, name: groupName.trim(), description: groupDescription.trim() }; await groupsApi.create(body); setGroupName(''); setGroupDescription(''); await load() }
     catch (saveError) { setGroupError(errorText(saveError)) } finally { setBusy(false) }
   }
 
   async function addMember(event: FormEvent) {
     event.preventDefault(); if (!selectedUser || !selectedRole) return
     setBusy(true); setMemberError('')
-    try { await projectMembersApi.add({ projectId, userId: Number(selectedUser), roleId: Number(selectedRole) }); setSelectedUser(''); setMemberQuery(''); await load() }
+    try { await projectMembersApi.add(projectId, { userId: Number(selectedUser), roleName: selectedRole as 'LEADER' | 'MEMBER' }); setSelectedUser(''); setMemberQuery(''); await load() }
     catch (saveError) { setMemberError(errorText(saveError)) } finally { setBusy(false) }
   }
 
@@ -132,13 +131,13 @@ export function ProjectWorkspace({ projectId }: { projectId: number }) {
         <div className="project-workspace__heading"><div><h2>Groups</h2><p>Organize project tasks into functional groups.</p></div></div>
         <form className="workspace-inline-form" onSubmit={(event) => void addGroup(event)}><Input id="new-group-name" label="Group name" value={groupName} onChange={(event) => setGroupName(event.target.value)} required maxLength={100} /><Input id="new-group-description" label="Description" value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} /><Button type="submit" variant="primary" disabled={busy}>Create group</Button></form>
         {groupError && <p className="workspace-error" role="alert">{groupError}</p>}
-        {groups.length === 0 ? <EmptyState title="No groups yet" detail="Create a group to organize this project's work." /> : <div className="workspace-list">{groups.map((group) => <article className="workspace-card workspace-card--compact" key={group.id}><div><h3>{group.name}</h3><p>{group.description || 'No description'} · {tasks.filter((task) => task.groupId === group.id).length} tasks</p></div><Button size="sm" variant="danger" disabled={busy} onClick={async () => { if (window.confirm(`Delete group “${group.name}”? Tasks in the group will remain ungrouped.`)) { setBusy(true); try { await groupsApi.delete(group.id); await load() } catch (failure) { setGroupError(errorText(failure)) } finally { setBusy(false) } } }}>Delete</Button></article>)}</div>}
+        {groups.length === 0 ? <EmptyState title="No groups yet" detail="Create a group to organize this project's work." /> : <div className="workspace-list">{groups.map((group) => <article className="workspace-card workspace-card--compact" key={group.id}><div><h3>{group.name}</h3><p>{group.description || 'No description'} · {tasks.filter((task) => task.groupId === group.id).length} tasks</p></div><Button size="sm" variant="danger" disabled={busy} onClick={async () => { if (window.confirm(`Delete group “${group.name}”? Tasks in the group will remain ungrouped.`)) { setBusy(true); try { await groupsApi.remove(group.id); await load() } catch (failure) { setGroupError(errorText(failure)) } finally { setBusy(false) } } }}>Delete</Button></article>)}</div>}
       </>}
       {tab === 'members' && <>
         <div className="project-workspace__heading"><div><h2>Project members</h2><p>Add existing user accounts and set their project role.</p></div></div>
-        <form className="workspace-inline-form workspace-inline-form--member" onSubmit={(event) => void addMember(event)}><Input id="member-search" label="Search user accounts" value={memberQuery} onChange={(event) => { setMemberQuery(event.target.value); setSelectedUser('') }} placeholder="Name or email" /><Select id="member-user" label="User" value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)} options={[{ value: '', label: candidates.length ? 'Choose user' : 'Search for an account' }, ...candidates.map((person) => ({ value: String(person.id), label: `${person.name} · ${person.email}` }))]} /><Select id="member-role" label="Project role" value={selectedRole} onChange={(event) => setSelectedRole(event.target.value)} options={[{ value: '', label: 'Choose role' }, ...roles.map((role) => ({ value: String(role.id), label: role.name }))]} /><Button type="submit" variant="primary" disabled={busy || !selectedUser || !selectedRole}>Add member</Button></form>
+        <form className="workspace-inline-form workspace-inline-form--member" onSubmit={(event) => void addMember(event)}><Input id="member-search" label="Search user accounts" value={memberQuery} onChange={(event) => { setMemberQuery(event.target.value); setSelectedUser('') }} placeholder="Name or email" /><Select id="member-user" label="User" value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)} options={[{ value: '', label: candidates.length ? 'Choose user' : 'Search for an account' }, ...candidates.map((person) => ({ value: String(person.id), label: `${person.name} · ${person.email}` }))]} /><Select id="member-role" label="Project role" value={selectedRole} onChange={(event) => setSelectedRole(event.target.value)} options={[{ value: '', label: 'Choose role' }, { value: 'MEMBER', label: 'Member' }, { value: 'LEADER', label: 'Leader' }]} /><Button type="submit" variant="primary" disabled={busy || !selectedUser || !selectedRole}>Add member</Button></form>
         {memberError && <p className="workspace-error" role="alert">{memberError}</p>}
-        {members.length === 0 ? <EmptyState title="No member records" detail="Add a member to enable task assignment." /> : <div className="workspace-list">{members.map((member) => <article className="workspace-card workspace-card--compact" key={member.id}><div className="workspace-member"><span className="workspace-avatar">{member.userName.trim().split(/\s+/).map((part) => part[0]).slice(0,2).join('').toUpperCase()}</span><div><h3>{member.userName}</h3><p>{member.roleName}</p></div></div><Button size="sm" variant="danger" disabled={busy} onClick={async () => { if (window.confirm(`Remove ${member.userName} from this project?`)) { setBusy(true); try { await projectMembersApi.remove(member.id); await load() } catch (failure) { setMemberError(errorText(failure)) } finally { setBusy(false) } } }}>Remove</Button></article>)}</div>}
+        {members.length === 0 ? <EmptyState title="No member records" detail="Add a member to enable task assignment." /> : <div className="workspace-list">{members.map((member) => <article className="workspace-card workspace-card--compact" key={member.id}><div className="workspace-member"><span className="workspace-avatar">{member.userName.trim().split(/\s+/).map((part) => part[0]).slice(0,2).join('').toUpperCase()}</span><div><h3>{member.userName}</h3><p>{member.roleName}</p></div></div><Button size="sm" variant="danger" disabled={busy || member.id === null} onClick={async () => { if (member.id !== null && window.confirm(`Remove ${member.userName} from this project?`)) { setBusy(true); try { await projectMembersApi.remove(projectId, member.id); await load() } catch (failure) { setMemberError(errorText(failure)) } finally { setBusy(false) } } }}>Remove</Button></article>)}</div>}
       </>}
     </div>}
     <Dialog open={taskDialog} onClose={() => { if (!busy) setTaskDialog(false) }} title={editingTask ? 'Edit task' : 'Create task'} description="Task dates, status, and priority are stored by the project service.">

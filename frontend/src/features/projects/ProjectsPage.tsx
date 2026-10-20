@@ -20,7 +20,7 @@ import { priorityTone, taskTone } from '../../lib/format'
 type StatusFilter = 'all' | ProjectStatus
 type DeadlineFilter = 'all' | 'overdue' | 'soon' | 'none'
 
-export function ProjectsPage() {
+export function ProjectsPage({ openCreate = false }: { openCreate?: boolean }) {
   const { workspace, createProject } = useDemoWorkspace()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
@@ -28,11 +28,8 @@ export function ProjectsPage() {
   const [formOpen, setFormOpen] = useState(false)
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('create') === '1') {
-      setFormOpen(true)
-      window.history.replaceState({}, '', '/projects')
-    }
-  }, [])
+    if (openCreate) setFormOpen(true)
+  }, [openCreate])
 
   const projects = useMemo(() => workspace.projects
     .filter((project) => (status === 'all' || project.status === status)
@@ -118,8 +115,8 @@ export function ProjectDetailPage({ id }: { id: number }) {
     { key: 'status', header: 'Status', render: (task) => <StatusBadge tone={taskTone(task.status)}>{taskStatusLabel(task.status)}</StatusBadge> },
   ]
 
-  function saveProject(values: ProjectValues) {
-    void updateProject(id, values)
+  async function saveProject(values: ProjectValues) {
+    await updateProject(id, values)
     setFormOpen(false)
   }
 
@@ -158,4 +155,3 @@ export function ProjectDetailPage({ id }: { id: number }) {
     </Dialog>
   </div>
 }
-
