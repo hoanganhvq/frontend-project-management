@@ -24,7 +24,11 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, credentials: 'include' })
   if (!response.ok) {
     const details = await readError(response)
-    const message = typeof details === 'string' && details ? details : `Request failed (${response.status})`
+    const payload = details && typeof details === 'object' ? details as Record<string, unknown> : null
+    const detailMessage = typeof details === 'string' ? details : payload
+      ? [payload.message, payload.error, payload.detail].find((value): value is string => typeof value === 'string')
+      : undefined
+    const message = detailMessage || `Request failed (${response.status})`
     throw new ApiError(message, response.status, details)
   }
   if (response.status === 204) return undefined as T

@@ -2,6 +2,7 @@ import type { KeyboardEvent, ReactNode } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
+import { ChatWidget } from './ChatWidget'
 import { useDemoWorkspace } from '../../app/DemoWorkspaceProvider'
 
 export function AppShell({ activePage, pageTitle, onNavigate, children }: { activePage: string; pageTitle: string; onNavigate: (page: string) => void; children: ReactNode }) {
@@ -9,7 +10,7 @@ export function AppShell({ activePage, pageTitle, onNavigate, children }: { acti
   const [mobileOpen, setMobileOpen] = useState(false)
   const sidebarRef = useRef<HTMLElement | null>(null)
   const menuButtonRef = useRef<HTMLButtonElement | null>(null)
-  const { persistenceNotice } = useDemoWorkspace()
+  const { persistenceNotice, refresh } = useDemoWorkspace()
 
   const closeMobileNav = useCallback(() => {
     setMobileOpen(false)
@@ -60,9 +61,10 @@ export function AppShell({ activePage, pageTitle, onNavigate, children }: { acti
     />
     <div className="app-shell__main">
       <TopBar menuButtonRef={(node) => { menuButtonRef.current = node }} menuExpanded={mobileOpen} onMenu={() => setMobileOpen(true)} pageTitle={pageTitle} onNavigate={onNavigate} />
-      <div className="demo-mode-banner" role="status"><span className="demo-mode-banner__dot" /><span>{activePage === 'Team members' ? <><strong>Live project membership</strong> · This tab reads and writes project roster data through the server; other workspace pages may still use browser demo data.</> : <><strong>Demo mode</strong> · Changes are saved only in this browser and are not sent to the project server.</>}</span></div>
-      {persistenceNotice && <div className="storage-warning" role="alert">{persistenceNotice}</div>}
+      <div className="demo-mode-banner" role="status"><span className="demo-mode-banner__dot" /><span><strong>Connected to project API</strong> · Projects, tasks, groups, and project membership use the server. AI planning, milestones, notifications, and preferences are preview-only.</span></div>
+      {persistenceNotice && <div className="storage-warning" role="alert">{persistenceNotice} <button type="button" onClick={() => void refresh()}>Retry</button></div>}
       <main id="main-content" className="main-content">{children}</main>
+      <ChatWidget />
     </div>
   </div>
 }

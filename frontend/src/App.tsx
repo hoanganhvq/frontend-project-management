@@ -1,4 +1,7 @@
-import { DemoWorkspaceProvider } from './app/DemoWorkspaceProvider'
+import { useEffect, useState, type FormEvent } from 'react'
+import { DemoWorkspaceProvider, getCurrentUser } from './app/DemoWorkspaceProvider'
+import { authApi } from './api/services'
+import { isApiError } from './api/client'
 import { useAppRoute, navigate } from './app/router'
 import { AppShell } from './components/layout/AppShell'
 import { DashboardPage } from './features/dashboard/DashboardPage'
@@ -10,6 +13,8 @@ import { ProfilePage } from './features/profile/ProfilePage'
 import { SettingsPage } from './features/profile/SettingsPage'
 import { TimelinePage } from './features/timeline/TimelinePage'
 import { TeamMembersPage } from './features/team/TeamMembersPage'
+import { Button } from './components/ui/Button'
+import { Input } from './components/ui/Input'
 
 const pageMeta = {
   dashboard: ['Dashboard', 'Dashboard'],
@@ -49,5 +54,41 @@ function RoutedApp() {
 }
 
 export default function App() {
-  return <DemoWorkspaceProvider><RoutedApp /></DemoWorkspaceProvider>
+  const [user, setUser] = useState<{ id: number; name: string; email: string; position?: string | null } | null>(null)
+  const [checking, setChecking] = useState(true)
+  const [error, setError] = useState('')
+  const [register, setRegister] = useState(false)
+
+  useEffect(() => {
+    getCurrentUser().then(setUser).catch(() => setUser(null)).finally(() => setChecking(false))
+  }, [])
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    const form = new FormData(event.currentTarget)
+    const email = String(form.get('email') ?? '').trim()
+    const password = String(form.get('password') ?? '')
+    try {
+      if (register) await authApi.register({ name: String(form.get('name') ?? '').trim(), email, password })
+      await authApi.login({ email, password })
+      setUser(await getCurrentUser())
+    } catch (issue) {
+      const message = issue instanceof Error ? issue.message : 'Could not sign in.'
+      setError(isApiError(issue) && issue.status === 401 ? 'Email or password is incorrect.' : message)
+    }
+  }
+
+  if (checking) return <main className="auth-screen"><p role="status">Checking your session…</p></main>
+  if (!user) return <main className="auth-screen"><section className="auth-card"><p className="auth-eyebrow">PROJECT MANAGEMENT</p><h1>{register ? 'Create your account' : 'Welcome back'}</h1><p>Sign in to load your projects and tasks from the server.</p>
+    <form className="auth-form" onSubmit={(event) => void submit(event)}>
+      {register && <Input id="auth-name" name="name" label="Name" autoComplete="name" required maxLength={100} />}
+      <Input id="auth-email" name="email" type="email" label="Email" autoComplete="email" required />
+      <Input id="auth-password" name="password" type="password" label="Password" autoComplete={register ? 'new-password' : 'current-password'} minLength={8} required />
+      {error && <p className="auth-error" role="alert">{error}</p>}
+      <Button type="submit" variant="primary">{register ? 'Create account' : 'Sign in'}</Button>
+    </form>
+    <button className="auth-switch" type="button" onClick={() => { setRegister((value) => !value); setError('') }}>{register ? 'Already have an account? Sign in' : 'New here? Create an account'}</button>
+  </section></main>
+  return <DemoWorkspaceProvider user={user}><RoutedApp /></DemoWorkspaceProvider>
 }

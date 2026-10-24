@@ -36,16 +36,15 @@ export function Sidebar({ activePage, collapsed, mobileOpen, sidebarRef, onKeyDo
       <span className="brand-name">Orbit<span>AI</span></span>
       <button className="sidebar__collapse icon-button" type="button" onClick={onToggle} aria-label={mobileOpen ? 'Close navigation' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={mobileOpen ? true : !collapsed} aria-controls="main-sidebar"><Icon name={mobileOpen ? 'close' : 'chevron'} /></button>
     </div>
-    <button className="workspace-switcher" type="button" disabled aria-label="Demo workspace selector, unavailable in preview"><span className="workspace-avatar">N</span><span className="workspace-switcher__copy"><strong>Nexa Labs</strong><small>Demo workspace</small></span><Icon name="chevron" /></button>
+    <button className="workspace-switcher" type="button" disabled aria-label="Project workspace"><span className="workspace-avatar">{workspace.profile.name.slice(0, 1).toUpperCase()}</span><span className="workspace-switcher__copy"><strong>My workspace</strong><small>Connected account</small></span><Icon name="chevron" /></button>
     <button className="sidebar-search" type="button" disabled aria-label="Quick search, unavailable in preview"><Icon name="search" /><span>Quick search</span><kbd>⌘ K</kbd></button>
-    <button className="button button--primary sidebar__create" type="button" onClick={() => onNavigate('New project')} aria-label="Create a demo project"><Icon name="plus" /><span>New project</span></button>
+    <button className="button button--primary sidebar__create" type="button" onClick={() => onNavigate('New project')} aria-label="Create a project"><Icon name="plus" /><span>New project</span></button>
     <nav className="sidebar__nav" aria-label="Main navigation">
       <p className="nav-label">Workspace</p>{workspaceLinks.map(renderLink)}
       <p className="nav-label nav-label--spaced">Current project</p>{projectLinks.map(renderLink)}
     </nav>
     <div className="sidebar__bottom">
-      <div className="storage" aria-label="Illustrative demo storage use"><div><span>Demo storage</span><strong>68%</strong></div><div className="storage__track"><span /></div><small>Illustrative only</small></div>
-      <button className="profile-button" type="button" onClick={() => onNavigate('Profile')} aria-label={`Open demo profile for ${workspace.profile.name}`}><span className="profile-avatar">{workspace.profile.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join('')}</span><span className="profile-button__copy"><strong>{workspace.profile.name}</strong><small>{workspace.profile.position}</small></span><Icon name="dots" /></button>
+      <button className="profile-button" type="button" onClick={() => onNavigate('Profile')} aria-label={`Open profile for ${workspace.profile.name}`}><span className="profile-avatar">{workspace.profile.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join('')}</span><span className="profile-button__copy"><strong>{workspace.profile.name}</strong><small>{workspace.profile.position}</small></span><Icon name="dots" /></button>
     </div>
   </aside>
 }

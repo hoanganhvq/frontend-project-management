@@ -9,6 +9,9 @@ export type ProjectMember = { id: number | null; projectName: string; projectId:
 export type ProjectMemberCandidate = { id: number; name: string; email: string; position: string | null; photo: string | null }
 export type ProjectMemberMutation = { userId: number; roleName: 'LEADER' | 'MEMBER' }
 export type ProjectMemberRoleUpdate = { roleName: 'LEADER' | 'MEMBER' }
+export type ProjectGroup = { id: number; projectId: number; projectName: string; name: string; description: string | null; createdAt: string }
+export type GroupMember = { id: number; groupId: number; groupName: string; memberId: number; memberName: string; memberEmail: string; joinedAt: string }
+export type ProjectGroupRequest = { projectId: number; name: string; description: string }
 
 export type TaskRequest = { projectId: number; groupId: number | null; parentTaskId: number | null; title: string; description: string; startDate: string | null; endDate: string | null; progress: number; priority: TaskPriority; status: TaskStatus; createdById: number }
 export type TaskUpdateRequest = Omit<TaskRequest, 'projectId' | 'createdById'>

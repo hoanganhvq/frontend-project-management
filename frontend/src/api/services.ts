@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { ApproveScheduleRequest, ApproveScheduleResponse, LoginRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskRequest, TaskResponse, TaskUpdateRequest } from './models'
+import type { ApproveScheduleRequest, ApproveScheduleResponse, GroupMember, LoginRequest, ProjectGroup, ProjectGroupRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskRequest, TaskResponse, TaskUpdateRequest } from './models'
 
 export const authApi = {
   login: (body: LoginRequest) => apiRequest<string>('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
@@ -17,12 +17,25 @@ export const projectsApi = {
 }
 
 export const projectMembersApi = {
-  getVisibleProjects: () => apiRequest<ProjectMemberProject[]>('/api/projects/mine/memberships'),
-  getByProject: (projectId: number) => apiRequest<ProjectMember[]>(`/api/projects/${projectId}/members`),
-  searchCandidates: (projectId: number, search: string) => apiRequest<ProjectMemberCandidate[]>(`/api/projects/${projectId}/member-candidates?search=${encodeURIComponent(search)}`),
-  add: (projectId: number, body: ProjectMemberMutation) => apiRequest<ProjectMember>(`/api/projects/${projectId}/members`, { method: 'POST', body: JSON.stringify(body) }),
-  updateRole: (projectId: number, memberId: number, body: ProjectMemberRoleUpdate) => apiRequest<ProjectMember>(`/api/projects/${projectId}/members/${memberId}/role`, { method: 'PUT', body: JSON.stringify(body) }),
-  remove: (projectId: number, memberId: number) => apiRequest<void>(`/api/projects/${projectId}/members/${memberId}`, { method: 'DELETE' }),
+  getVisibleProjects: () => apiRequest<ProjectMemberProject[]>('/api/projectmembers/projects'),
+  getByProject: (projectId: number) => apiRequest<ProjectMember[]>(`/api/projectmembers/project/${projectId}`),
+  searchCandidates: (projectId: number, search: string) => apiRequest<ProjectMemberCandidate[]>(`/api/projectmembers/candidates?projectId=${projectId}&search=${encodeURIComponent(search)}`),
+  add: (projectId: number, body: ProjectMemberMutation) => apiRequest<ProjectMember>('/api/projectmembers', { method: 'POST', body: JSON.stringify({ ...body, projectId }) }),
+  updateRole: (_projectId: number, memberId: number, body: ProjectMemberRoleUpdate) => apiRequest<ProjectMember>(`/api/projectmembers/${memberId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  remove: (_projectId: number, memberId: number) => apiRequest<void>(`/api/projectmembers/${memberId}`, { method: 'DELETE' }),
+}
+
+export const groupsApi = {
+  getByProject: (projectId: number) => apiRequest<ProjectGroup[]>(`/api/group/project/${projectId}`),
+  create: (body: ProjectGroupRequest) => apiRequest<ProjectGroup>('/api/group', { method: 'POST', body: JSON.stringify(body) }),
+  update: (groupId: number, body: ProjectGroupRequest) => apiRequest<ProjectGroup>(`/api/group/${groupId}`, { method: 'PUT', body: JSON.stringify(body) }),
+  remove: (groupId: number) => apiRequest<ProjectGroup>(`/api/group/${groupId}`, { method: 'DELETE' }),
+}
+
+export const groupMembersApi = {
+  getByGroup: (groupId: number) => apiRequest<GroupMember[]>(`/api/groupmember/group/${groupId}`),
+  add: (groupId: number, userId: number) => apiRequest<GroupMember>('/api/groupmember', { method: 'POST', body: JSON.stringify({ groupId, userId }) }),
+  remove: (groupId: number, userId: number) => apiRequest<GroupMember>(`/api/groupmember?groupId=${groupId}&userId=${userId}`, { method: 'DELETE' }),
 }
 
 export const tasksApi = {
