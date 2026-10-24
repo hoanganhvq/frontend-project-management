@@ -7,6 +7,7 @@ import { FormField } from '../../components/ui/FormField'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
 import type { Task, TaskBoardColumn, TaskPriority, TaskStatus } from '../../types/domain'
+import { getSettingsPreferences } from '../../app/settingsPreferences'
 
 export type TaskValues = Omit<Task, 'id' | 'createdAt' | 'createdByName'>
 
@@ -19,16 +20,25 @@ type Props = {
   onSave: (task: TaskValues) => void | Promise<void>
 }
 
-function initialValues(projectId: number, task?: Task, initialBoardColumn: TaskBoardColumn = 'todo'): TaskValues {
+function initialValues(projectId: number, task?: Task, initialBoardColumn?: TaskBoardColumn): TaskValues {
+  const defaultStatus = getSettingsPreferences().defaultTaskStatus
+  const status = initialBoardColumn === 'done' ? 'done'
+    : initialBoardColumn === 'in_progress' ? 'in_progress'
+      : initialBoardColumn === 'todo' ? 'todo' : defaultStatus
+  const boardColumn = status === 'canceled' ? undefined : status
   return task
     ? { projectId: task.projectId, groupId: task.groupId, parentTaskId: task.parentTaskId, title: task.title, description: task.description, startDate: task.startDate, endDate: task.endDate, progress: task.progress, priority: task.priority, status: task.status, boardColumn: task.boardColumn, assigneeName: task.assigneeName ?? '', module: task.module ?? '', estimateHours: task.estimateHours, dependencyIds: task.dependencyIds ?? [] }
-    : { projectId, groupId: null, parentTaskId: null, title: '', description: '', startDate: '', endDate: '', progress: 0, priority: 'medium', status: initialBoardColumn === 'done' ? 'done' : initialBoardColumn === 'todo' ? 'todo' : 'in_progress', boardColumn: initialBoardColumn, assigneeName: '', module: '', estimateHours: undefined, dependencyIds: [] }
+    : { projectId, groupId: null, parentTaskId: null, title: '', description: '', startDate: '', endDate: '', progress: 0, priority: 'medium', status, boardColumn, assigneeName: '', module: '', estimateHours: undefined, dependencyIds: [] }
 }
 
 export function TaskFormDialog({ open, projectId, task, initialBoardColumn, onClose, onSave }: Props) {
   const [groups, setGroups] = useState<ProjectGroup[]>([])
   const [values, setValues] = useState<TaskValues>(() => initialValues(projectId, task, initialBoardColumn))
   const [dateError, setDateError] = useState('')
+
+  useEffect(() => {
+    if (open) setValues(initialValues(projectId, task, initialBoardColumn))
+  }, [open, projectId, task, initialBoardColumn])
   const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
 

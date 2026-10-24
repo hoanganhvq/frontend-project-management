@@ -4,13 +4,26 @@ import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { ChatWidget } from './ChatWidget'
 import { useDemoWorkspace } from '../../app/DemoWorkspaceProvider'
+import { getSettingsPreferences, saveSettingsPreferences } from '../../app/settingsPreferences'
 
 export function AppShell({ activePage, pageTitle, onNavigate, children }: { activePage: string; pageTitle: string; onNavigate: (page: string) => void; children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [settings, setSettings] = useState(getSettingsPreferences)
+  const [collapsed, setCollapsed] = useState(() => getSettingsPreferences().sidebarCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
   const sidebarRef = useRef<HTMLElement | null>(null)
   const menuButtonRef = useRef<HTMLButtonElement | null>(null)
   const { persistenceNotice, refresh } = useDemoWorkspace()
+
+  useEffect(() => {
+    const syncSettings = (event: Event) => {
+      const next = (event as CustomEvent<typeof settings>).detail
+      if (!next) return
+      setSettings(next)
+      setCollapsed(next.sidebarCollapsed)
+    }
+    window.addEventListener('app:settings-changed', syncSettings)
+    return () => window.removeEventListener('app:settings-changed', syncSettings)
+  }, [])
 
   const closeMobileNav = useCallback(() => {
     setMobileOpen(false)
@@ -52,16 +65,23 @@ export function AppShell({ activePage, pageTitle, onNavigate, children }: { acti
     {mobileOpen && <button className="mobile-scrim" type="button" aria-label="Close navigation" onClick={closeMobileNav} />}
     <Sidebar
       activePage={activePage}
+      workspaceName={settings.workspaceName}
+      workspaceLogo={settings.workspaceLogoDataUrl}
       collapsed={collapsed}
       mobileOpen={mobileOpen}
       sidebarRef={(node) => { sidebarRef.current = node }}
       onKeyDown={handleSidebarKeyDown}
       onNavigate={(page) => { onNavigate(page); closeMobileNav() }}
-      onToggle={() => mobileOpen ? closeMobileNav() : setCollapsed((value) => !value)}
+      onToggle={() => {
+        if (mobileOpen) { closeMobileNav(); return }
+        const nextCollapsed = !collapsed
+        setCollapsed(nextCollapsed)
+        saveSettingsPreferences({ ...getSettingsPreferences(), sidebarCollapsed: nextCollapsed })
+      }}
     />
     <div className="app-shell__main">
       <TopBar menuButtonRef={(node) => { menuButtonRef.current = node }} menuExpanded={mobileOpen} onMenu={() => setMobileOpen(true)} pageTitle={pageTitle} onNavigate={onNavigate} />
-      {activePage !== 'Dashboard' && activePage !== 'Projects' && activePage !== 'Team members' && pageTitle !== 'Task details' && <div className="demo-mode-banner" role="status"><span className="demo-mode-banner__dot" /><span><strong>Connected to project API</strong> · Projects, tasks, groups, and project membership use the server. AI schedule generation sends PDFs to the n8n test webhook; milestones, notifications, and preferences are preview-only.</span></div>}
+      {activePage !== 'Dashboard' && activePage !== 'Projects' && activePage !== 'Team members' && activePage !== 'Task board' && activePage !== 'AI planner' && activePage !== 'Timeline' && activePage !== 'Settings' && pageTitle !== 'Task details' && <div className="demo-mode-banner" role="status"><span className="demo-mode-banner__dot" /><span><strong>Connected to project API</strong> · Projects, tasks, groups, and project membership use the server. AI schedule generation sends PDFs to the n8n test webhook; milestones and notifications have no API, while preferences stay on this device.</span></div>}
       {persistenceNotice && <div className="storage-warning" role="alert">{persistenceNotice} <button type="button" onClick={() => void refresh()}>Retry</button></div>}
       <main id="main-content" className="main-content">{children}</main>
       <ChatWidget />

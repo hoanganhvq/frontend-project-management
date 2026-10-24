@@ -7,7 +7,7 @@ import { Icon } from '../../components/ui/Icon'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { EmptyState, ErrorState, LoadingState } from '../../components/ui/States'
-import { formatDate, projectTone, taskTone, toLocalDateInput } from '../../lib/format'
+import { formatDate, formatNumber, projectTone, taskTone, toLocalDateInput } from '../../lib/format'
 import { projectStatusLabel, taskStatusLabel, type ProjectStatus, type TaskStatus } from '../../types/domain'
 
 function normalizeProjectStatus(status: ProjectStatus): ProjectStatus {
@@ -47,11 +47,11 @@ export function DashboardPage() {
 
     {workspaceStatus === 'loading' ? <LoadingState label="Loading your projects and tasks…" /> : workspaceStatus === 'error' ? <ErrorState title="Dashboard could not load" detail="The project service could not load your workspace. Check the connection and retry." action={<Button variant="secondary" onClick={() => void refresh()}>Try again</Button>} /> : <>
       <section className="metric-grid" aria-label="Project and task summary">
-        <article className="metric-card"><span>Active projects</span><strong>{activeProjects.length}</strong><small>Projects in progress</small></article>
-        <article className="metric-card"><span>Open tasks</span><strong>{openTasks.length}</strong><small>To do or in progress</small></article>
-        <article className="metric-card"><span>Completed tasks</span><strong>{completedTasks}</strong><small>Across accessible projects</small></article>
-        <article className="metric-card"><span>Overdue tasks</span><strong>{overdueTasks.length}</strong><small>Open tasks past their due date</small></article>
-        <article className="metric-card"><span>Due in 7 days</span><strong>{dueSoonTasks.length}</strong><small>Including tasks due today</small></article>
+        <article className="metric-card"><span>Active projects</span><strong>{formatNumber(activeProjects.length)}</strong><small>Projects in progress</small></article>
+        <article className="metric-card"><span>Open tasks</span><strong>{formatNumber(openTasks.length)}</strong><small>To do or in progress</small></article>
+        <article className="metric-card"><span>Completed tasks</span><strong>{formatNumber(completedTasks)}</strong><small>Across accessible projects</small></article>
+        <article className="metric-card"><span>Overdue tasks</span><strong>{formatNumber(overdueTasks.length)}</strong><small>Open tasks past their due date</small></article>
+        <article className="metric-card"><span>Due in 7 days</span><strong>{formatNumber(dueSoonTasks.length)}</strong><small>Including tasks due today</small></article>
       </section>
 
       <section className="dashboard-grid" aria-label="Dashboard sections">

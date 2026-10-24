@@ -6,7 +6,7 @@ export type ProjectUpdateRequest = { name: string; description: string; startDat
 export type UserResponse = { id: number; name: string; email: string; position: string | null; role: string; photo: string | null }
 export type UserUpdateRequest = { name?: string; email?: string; position?: string | null }
 export type ProjectResponse = { id: number; name: string; description: string | null; startDate: string | null; endDate: string | null; owner: UserResponse; status: string; createdAt: string }
-export type ProjectMemberProject = { id: number; name: string; ownerId: number; ownerName: string; canManageMembers: boolean; canAssignLeader: boolean }
+export type ProjectMemberProject = { id: number; name: string; ownerId: number; ownerName: string; canManageMembers: boolean; canAssignLeader: boolean; canEditSchedule: boolean }
 export type MemberSkill = { skillId: number; name: string; category: string | null; level: string }
 export type ProjectMember = { id: number | null; projectName: string; projectId: number; userId: number; userName: string; email: string; photo: string | null; position: string | null; roleId: number | null; roleName: 'OWNER' | 'LEADER' | 'MEMBER'; joinedAt: string | null; projectOwner: boolean; skills: MemberSkill[] }
 export type ProjectMemberCandidate = { id: number; name: string; email: string; position: string | null; photo: string | null }
@@ -20,6 +20,8 @@ export type TaskDependency = { id: number; taskId: number; taskTitle: string; de
 
 export type TaskRequest = { projectId: number; groupId: number | null; parentTaskId: number | null; title: string; description: string; startDate: string | null; endDate: string | null; progress: number; priority: TaskPriority; status: TaskStatus; createdById: number }
 export type TaskUpdateRequest = Omit<TaskRequest, 'projectId' | 'createdById'>
+export type TaskScheduleUpdateRequest = { taskId: number; startDate: string; endDate: string }
+export type TaskScheduleBatchUpdateRequest = { projectId: number; tasks: TaskScheduleUpdateRequest[] }
 export type TaskResponse = { id: number; projectId: number; groupId: number | null; parentTaskId: number | null; parentTaskTitle: string | null; title: string; description: string; startDate: string | null; endDate: string | null; progress: number; priority: TaskPriority; status: TaskStatus; createdById: number; createdByName: string; createdAt: string }
 
 export type LoginRequest = { email: string; password: string }

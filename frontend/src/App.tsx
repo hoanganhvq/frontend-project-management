@@ -13,6 +13,8 @@ import { SettingsPage } from './features/profile/SettingsPage'
 import { TimelinePage } from './features/timeline/TimelinePage'
 import { TeamMembersPage } from './features/team/TeamMembersPage'
 import { AuthLoadingPage, AuthUnavailablePage, LoginPage, RegisterPage } from './features/auth/LoginPage'
+import { applySettingsPreferences, getDefaultLandingPath, getSettingsPreferences } from './app/settingsPreferences'
+import { LocalizedApp } from './app/LocalizedApp'
 
 const pageMeta = {
   login: ['Sign in', 'Sign in'],
@@ -35,6 +37,16 @@ function RoutedApp() {
   const route = useAppRoute()
   const { user, status, error: authError, refresh } = useAuth()
   const [defaultActivePage, pageTitle] = pageMeta[route.page]
+
+  useEffect(() => {
+    applySettingsPreferences()
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const updateSystemTheme = () => {
+      if (getSettingsPreferences().theme === 'system') applySettingsPreferences()
+    }
+    media.addEventListener('change', updateSystemTheme)
+    return () => media.removeEventListener('change', updateSystemTheme)
+  }, [])
   const taskSourcePath = route.page === 'task-detail'
     ? taskDetailSourcePath(`${window.location.pathname}${window.location.search}`)
     : ''
@@ -57,7 +69,7 @@ function RoutedApp() {
     }
     if (user && (route.page === 'login' || route.page === 'register')) {
       const requested = new URLSearchParams(window.location.search).get('redirect')
-      const target = requested?.startsWith('/') && !requested.startsWith('//') ? requested : '/dashboard'
+      const target = requested?.startsWith('/') && !requested.startsWith('//') ? requested : getDefaultLandingPath()
       navigate(target, { replace: true })
     }
   }, [status, user, route.page])
@@ -87,7 +99,7 @@ function RoutedApp() {
 }
 
 export default function App() {
-  return <AuthProvider><AuthenticatedApp /></AuthProvider>
+  return <LocalizedApp><AuthProvider><AuthenticatedApp /></AuthProvider></LocalizedApp>
 }
 
 function AuthenticatedApp() {

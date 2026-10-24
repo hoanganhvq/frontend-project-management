@@ -31,7 +31,7 @@ export function TasksPage() {
   const [priority, setPriority] = useState('all')
   const [deadline, setDeadline] = useState('all')
   const [createOpen, setCreateOpen] = useState(false)
-  const [createColumn, setCreateColumn] = useState<TaskBoardColumn>('todo')
+  const [createColumn, setCreateColumn] = useState<TaskBoardColumn | undefined>()
   const [editTask, setEditTask] = useState<Task | undefined>()
   const [assigneeNames, setAssigneeNames] = useState<Record<number, string>>({})
   const [groupNames, setGroupNames] = useState<Record<number, string>>({})
@@ -101,10 +101,9 @@ export function TasksPage() {
   }
 
   return <div className="page-stack">
-    <PageHeader eyebrow="DAILY TRACKING" title="Task board" description="Track tasks from your server workspace." actions={<Button variant="primary" icon={<Icon name="plus" />} onClick={() => { setCreateColumn('todo'); setCreateOpen(true) }} disabled={!workspace.projects.length}>Add task</Button>} />
-    <aside className="preview-notice"><span className="preview-notice__icon"><Icon name="board" /></span><p><strong>Server task data.</strong> Task changes are saved to the backend. Board columns match the server task statuses.</p><span className="demo-label"><span />API</span></aside>
-    {workspaceStatus === 'loading' && <LoadingState label="Loading server tasks…" />}
-    {workspaceStatus === 'error' && <ErrorState title="Could not load tasks" detail="The server task list is unavailable. Retry to load current project data." action={<Button onClick={() => void refresh()}>Try again</Button>} />}
+    <PageHeader eyebrow="DAILY TRACKING" title="Task board" description="Plan, filter, and update your work across projects." actions={<Button variant="primary" icon={<Icon name="plus" />} onClick={() => { setCreateColumn(undefined); setCreateOpen(true) }} disabled={!workspace.projects.length}>Add task</Button>} />
+    {workspaceStatus === 'loading' && <LoadingState label="Loading tasks…" />}
+    {workspaceStatus === 'error' && <ErrorState title="Could not load tasks" detail="The task list is unavailable. Retry to load current project data." action={<Button onClick={() => void refresh()}>Try again</Button>} />}
     {assigneeError && <ErrorState title="Could not load task assignees" detail={assigneeError} action={<Button onClick={() => void refresh()}>Refresh tasks</Button>} />}
     {assigneeLoading && workspaceStatus === 'ready' && <p role="status">Loading task assignees…</p>}
     <div className="page-toolbar task-board-filters" aria-label="Task filters">

@@ -294,23 +294,17 @@ export function AIPlannerPage() {
 
   return <div className="page-stack ai-planner-page">
     <PageHeader eyebrow="PLANNING WORKFLOW" title="AI planner" description="Upload an SRS PDF to generate a schedule for review." />
-    <aside className="preview-notice">
-      <span className="preview-notice__icon"><Icon name="sparkles" /></span>
-      <p><strong>Schedule generation</strong> sends the selected PDF to the n8n planning webhook. A schedule appears as saved only after the webhook confirms success.</p>
-      <StatusBadge tone="blue">PDF upload</StatusBadge>
-    </aside>
-
     <nav className="planner-stepper" aria-label="AI planning progress">
       <ol>
         <li className={step === 'upload' ? 'planner-step--current' : 'planner-step--complete'}>
           <span aria-current={step === 'upload' ? 'step' : undefined}>
-            <span className="planner-step__number">1</span>
+            <span className="planner-step__number">{step === 'upload' ? '1' : <Icon name="check" />}</span>
             <span><strong>Upload SRS</strong><small>Generate schedule</small></span>
           </span>
         </li>
         <li className={step === 'review' ? 'planner-step--current' : step === 'complete' ? 'planner-step--complete' : ''}>
           <span aria-current={step === 'review' ? 'step' : undefined}>
-            <span className="planner-step__number">2</span>
+            <span className="planner-step__number">{step === 'complete' ? <Icon name="check" /> : '2'}</span>
             <span><strong>Review & assign</strong><small>Edit draft</small></span>
           </span>
         </li>
@@ -348,23 +342,26 @@ export function AIPlannerPage() {
       </div>}
     </section>}
 
-    {step === 'upload' ? <section className="content-panel planner-step-card" aria-labelledby="planner-input-heading">
+    {step === 'upload' ? <section className={`content-panel planner-step-card${submitting ? ' planner-step-card--working' : ''}`} aria-labelledby="planner-input-heading">
       <div className="panel-heading">
-        <div><h2 id="planner-input-heading">Generate a schedule</h2><p>Your account is used as the project leader.</p></div>
+        <div><h2 id="planner-input-heading">Generate a schedule</h2><p>Upload a PDF SRS to build a draft you can review and assign.</p></div>
       </div>
       <div className="planner-step-card__body">
-        <label className="document-dropzone" htmlFor="srs-file">
-          <Icon name="inbox" />
-          <strong>{file ? file.name : 'Select an SRS PDF'}</strong>
-          <span>{file ? `${(file.size / 1024 / 1024).toFixed(2)} MB · PDF` : 'PDF only · up to 10 MB'}</span>
+        <label className={`document-dropzone${file ? ' document-dropzone--selected' : ''}`} htmlFor="srs-file">
+          <span className="document-dropzone__icon"><Icon name="inbox" /></span>
+          <span className="document-dropzone__copy"><strong>{file ? file.name : 'Choose an SRS PDF'}</strong><small>{file ? `${(file.size / 1024 / 1024).toFixed(2)} MB · PDF document` : 'Select a PDF file to start building your project schedule.'}</small></span>
+          <span className="document-dropzone__format">PDF</span>
+          <span className="document-dropzone__action">{file ? 'Change file' : 'Browse files'}</span>
           <input id="srs-file" type="file" accept="application/pdf,.pdf" required disabled={submitting} onChange={(event) => selectFile(event.target.files?.[0])} />
         </label>
+
+        {submitting && <div className="planner-generation-progress" role="status" aria-live="polite"><span className="planner-spinner" aria-hidden="true" /><div className="planner-generation-progress__copy"><strong>Generating your schedule</strong><span>Uploading the PDF and preparing your draft. This may take a moment.</span></div><span className="planner-generation-progress__bar" aria-hidden="true"><span /></span></div>}
 
         <div className="planner-step-card__actions">
           {file && <Button variant="secondary" disabled={submitting} onClick={() => selectFile(undefined)}>Remove file</Button>}
           <span className="planner-step-card__spacer" />
           <Button variant="primary" disabled={authUnavailable || !file || submitting} onClick={() => void submit()}>
-            {submitting ? 'Generating and saving…' : 'Generate schedule'}
+            {submitting && <span className="planner-spinner planner-spinner--button" aria-hidden="true" />}{submitting ? 'Generating and saving…' : 'Generate schedule'}
           </Button>
         </div>
 

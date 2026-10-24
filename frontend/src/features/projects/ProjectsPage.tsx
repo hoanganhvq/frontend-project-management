@@ -16,6 +16,7 @@ import { navigate, taskDetailPath } from '../../app/router'
 import { ProjectFormDialog, type ProjectValues } from './ProjectFormDialog'
 import { TaskFormDialog, type TaskValues } from '../tasks/TaskFormDialog'
 import { priorityTone, taskTone } from '../../lib/format'
+import { getSettingsPreferences, type SettingsPreferences } from '../../app/settingsPreferences'
 
 type StatusFilter = 'all' | ProjectStatus
 type DeadlineFilter = 'all' | 'overdue' | 'soon' | 'none'
@@ -26,6 +27,16 @@ export function ProjectsPage({ openCreate = false }: { openCreate?: boolean }) {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [sort, setSort] = useState('name')
   const [formOpen, setFormOpen] = useState(false)
+  const [projectView, setProjectView] = useState(() => getSettingsPreferences().defaultProjectView)
+
+  useEffect(() => {
+    const syncView = (event: Event) => {
+      const next = (event as CustomEvent<SettingsPreferences>).detail?.defaultProjectView
+      if (next) setProjectView(next)
+    }
+    window.addEventListener('app:settings-changed', syncView)
+    return () => window.removeEventListener('app:settings-changed', syncView)
+  }, [])
 
   useEffect(() => {
     if (openCreate) setFormOpen(true)
@@ -63,7 +74,9 @@ export function ProjectsPage({ openCreate = false }: { openCreate?: boolean }) {
       <span className="result-count">{projects.length} {projects.length === 1 ? 'project' : 'projects'}</span>
     </div>
     {workspaceStatus === 'ready' && (projects.length > 0
-      ? <DataTable caption="Projects in your server workspace" columns={columns} rows={projects} rowKey={(project) => project.id} />
+      ? projectView === 'list'
+        ? <DataTable caption="Projects in your server workspace" columns={columns} rows={projects} rowKey={(project) => project.id} />
+        : <div className="projects-card-grid">{projects.map((project) => <article className="projects-card" key={project.id}><div className="projects-card__top"><span className="projects-card__icon"><Icon name="folder" /></span><StatusBadge tone={projectTone(project.status)}>{projectStatusLabel(project.status)}</StatusBadge></div><button type="button" className="projects-card__title" onClick={() => navigate(`/projects/${project.id}`)}>{project.name}</button><p>{project.description || 'No description'}</p><div className="projects-card__dates"><span><small>Start date</small><strong>{formatDate(project.startDate)}</strong></span><span><small>End date</small><strong>{formatDate(project.endDate)}</strong></span></div><div className="projects-card__footer"><span>{workspace.tasks.filter((task) => task.projectId === project.id).length} tasks</span><Button size="sm" variant="secondary" onClick={() => navigate(`/projects/${project.id}`)}>Open project</Button></div></article>)}</div>
       : <EmptyState title={workspace.projects.length ? 'No matching projects' : 'No projects yet'} detail={workspace.projects.length ? 'Try changing the search or status filters.' : 'Create a project to start organizing the work.'} action={!workspace.projects.length && <Button variant="primary" onClick={() => setFormOpen(true)}>Create project</Button>} />)}
     <ProjectFormDialog open={formOpen} onClose={() => setFormOpen(false)} onSave={saveProject} />
   </div>

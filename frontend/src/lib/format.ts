@@ -1,9 +1,20 @@
 import type { ProjectStatus, TaskPriority, TaskStatus } from '../types/domain'
+import { getSettingsPreferences } from '../app/settingsPreferences'
 
 export function formatDate(value: string): string {
   if (!value) return 'No date set'
   const date = new Date(`${value}T00:00:00`)
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
+  if (Number.isNaN(date.getTime())) return value
+  const preferences = getSettingsPreferences()
+  if (preferences.dateFormat === 'yyyy-mm-dd') return value
+  const locale = preferences.language === 'vi' ? 'vi-VN' : preferences.language === 'ja' ? 'ja-JP' : 'en-US'
+  return new Intl.DateTimeFormat(locale, preferences.dateFormat === 'dd-mm-yyyy'
+    ? { day: '2-digit', month: '2-digit', year: 'numeric' }
+    : { month: '2-digit', day: '2-digit', year: 'numeric' }).format(date)
+}
+
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat(getSettingsPreferences().numberLocale).format(value)
 }
 
 export function toLocalDateInput(date: Date): string {
