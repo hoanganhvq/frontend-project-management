@@ -117,9 +117,18 @@ export function ProjectGroupsPanel({ projectId, projectName, projectMembers, can
     if (!Number.isSafeInteger(userId) || userId <= 0) return
     setBusy(true)
     try {
-      await groupMembersApi.add(group.id, userId)
+      const addedMember = await groupMembersApi.add(group.id, userId)
+      const updatedMembersByGroup = {
+        ...membersByGroup,
+        [group.id]: [...(membersByGroup[group.id] ?? []), addedMember],
+      }
+      setMembersByGroup(updatedMembersByGroup)
+      onGroupData({ groups, membersByGroup: updatedMembersByGroup })
+      const nextAvailableMember = projectMembers.find((member) =>
+        member.userId !== userId && !(updatedMembersByGroup[group.id] ?? []).some((item) => item.memberId === member.userId),
+      )
+      setMemberChoices((current) => ({ ...current, [group.id]: nextAvailableMember ? String(nextAvailableMember.userId) : '' }))
       announce('Member added to group.')
-      setReload((current) => current + 1)
     } catch (addError) {
       setError(addError instanceof Error ? addError.message : 'The member could not be added to the group.')
     } finally { setBusy(false) }
@@ -129,8 +138,14 @@ export function ProjectGroupsPanel({ projectId, projectName, projectMembers, can
     setBusy(true)
     try {
       await groupMembersApi.remove(group.id, member.memberId)
+      const updatedMembersByGroup = {
+        ...membersByGroup,
+        [group.id]: (membersByGroup[group.id] ?? []).filter((item) => item.id !== member.id),
+      }
+      setMembersByGroup(updatedMembersByGroup)
+      onGroupData({ groups, membersByGroup: updatedMembersByGroup })
+      setMemberChoices((current) => ({ ...current, [group.id]: String(member.memberId) }))
       announce(`${member.memberName} was removed from ${group.name}.`)
-      setReload((current) => current + 1)
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : 'The member could not be removed from the group.')
     } finally { setBusy(false) }

@@ -1,5 +1,5 @@
 import { ApiError, apiRequest } from './client'
-import type { AiScheduleMember, AiScheduleResponse, ApproveScheduleRequest, ApproveScheduleResponse, GenerateAiScheduleResponse, GroupMember, LoginRequest, N8nScheduleChatRequest, N8nScheduleChatResponse, ProjectGroup, ProjectGroupRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskAssignee, TaskDependency, TaskRequest, TaskResponse, TaskUpdateRequest, UpdatePendingScheduleRequest, UserResponse, UserUpdateRequest } from './models'
+import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary, ApproveScheduleRequest, ApproveScheduleResponse, GenerateAiScheduleResponse, GroupMember, LoginRequest, N8nScheduleChatRequest, N8nScheduleChatResponse, ProjectGroup, ProjectGroupRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskAssignee, TaskDependency, TaskRequest, TaskResponse, TaskUpdateRequest, UpdatePendingScheduleRequest, UserResponse, UserUpdateRequest } from './models'
 
 export const authApi = {
   login: (body: LoginRequest) => apiRequest<string>('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
@@ -65,8 +65,10 @@ export const tasksApi = {
 
 export const aiSchedulesApi = {
   getLatestPending: () => apiRequest<AiScheduleResponse>('/api/ai-schedules'),
+  getPending: () => apiRequest<AiScheduleSummary[]>('/api/ai-schedules/pending'),
+  getPendingById: (scheduleId: number) => apiRequest<AiScheduleResponse>(`/api/ai-schedules/${scheduleId}`),
+  updatePending: (scheduleId: number, body: UpdatePendingScheduleRequest) => apiRequest<SavePendingScheduleResponse>(`/api/ai-schedules/${scheduleId}`, { method: 'PUT', body: JSON.stringify(body) }),
   getAssignableMembers: (keyword = '') => apiRequest<AiScheduleMember[]>(`/api/ai-schedules/members?keyword=${encodeURIComponent(keyword)}`),
-  patchPending: (scheduleId: number, body: UpdatePendingScheduleRequest) => apiRequest<SavePendingScheduleResponse>(`/api/ai-schedules/${scheduleId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   sendChatAction: async (body: N8nScheduleChatRequest) => {
     let response: Response
     try {

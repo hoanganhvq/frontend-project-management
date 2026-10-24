@@ -44,6 +44,7 @@ export type AiScheduleResponse = {
     aiNote?: string
   }
 }
+export type AiScheduleSummary = { id: number; status: string; sessionId: string | null; createdAt: string; projectName: string; totalGroups: number; totalTasks: number }
 export type ApproveScheduleRequest = { scheduleId: number; leaderId: number }
 export type ApproveScheduleResponse = { success: boolean; projectId: number; totalTasksInserted: number; message: string }
 export type RejectScheduleRequest = { scheduleId: number; reason: string }

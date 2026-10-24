@@ -36,6 +36,17 @@
 .planner-pending-file { margin: 0; overflow-wrap: anywhere; color: var(--color-muted); font-size: var(--font-size-sm); }
 .planner-pending-file strong { color: var(--color-ink-soft); }
 .planner-pending-loading { margin: 0; color: var(--color-muted); font-size: var(--font-size-sm); }
+.planner-pending-drafts { margin-bottom: var(--space-5); }
+.planner-pending-drafts__list { display: grid; padding: 0 var(--space-5) var(--space-5); gap: var(--space-2); }
+.planner-pending-drafts__empty { margin: 0; padding: 0 var(--space-5) var(--space-5); color: var(--color-muted); font-size: var(--font-size-sm); }
+.planner-pending-drafts__error { padding: 0 var(--space-5) var(--space-4); }
+.planner-pending-draft { display: grid; min-width: 0; grid-template-columns: 2.25rem minmax(0, 1fr) auto auto; align-items: center; padding: var(--space-3); gap: var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-sm); background: var(--color-surface); }
+.planner-pending-draft__icon { display: grid; width: 2.25rem; height: 2.25rem; place-items: center; border-radius: var(--radius-sm); background: var(--color-accent-soft); color: var(--color-accent); }
+.planner-pending-draft__icon svg { width: 1.1rem; height: 1.1rem; }
+.planner-pending-draft__details { display: grid; min-width: 0; gap: var(--space-1); }
+.planner-pending-draft__details strong { overflow: hidden; color: var(--color-ink-soft); font-size: var(--font-size-sm); text-overflow: ellipsis; white-space: nowrap; }
+.planner-pending-draft__details span, .planner-pending-draft__counts { color: var(--color-muted); font-size: var(--font-size-xs); }
+.planner-pending-draft__counts { white-space: nowrap; }
 .planner-schedule-load-error { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; padding: var(--space-3) var(--space-4); gap: var(--space-3); border: 1px solid var(--color-error-line); border-radius: var(--radius-sm); background: var(--color-error-surface); }
 .planner-schedule-load-error p { margin: 0; color: var(--color-red); font-size: var(--font-size-sm); }
 .schedule-preview { display: grid; min-width: 0; gap: var(--space-4); }
@@ -179,6 +190,10 @@
   .planner-step__number { width: 1.65rem; height: 1.65rem; }
   .planner-stepper strong { font-size: .66rem; }
   .planner-step-card__body { padding: var(--space-3); gap: var(--space-4); }
+  .planner-pending-drafts__list { padding-right: var(--space-3); padding-left: var(--space-3); }
+  .planner-pending-drafts__empty, .planner-pending-drafts__error { padding-right: var(--space-3); padding-left: var(--space-3); }
+  .planner-pending-draft { grid-template-columns: 2.25rem minmax(0, 1fr); gap: var(--space-2); }
+  .planner-pending-draft__counts, .planner-pending-draft > .button { grid-column: 2; justify-self: start; }
   .draft-fields { grid-template-columns: 1fr; }
   .draft-review__columns .draft-section { padding: var(--space-3); }
   .draft-milestone { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }

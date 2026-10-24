@@ -97,8 +97,30 @@ export function ProjectWorkspace({ projectId }: { projectId: number }) {
   async function addMember(event: FormEvent) {
     event.preventDefault(); if (!selectedUser || !selectedRole) return
     setBusy(true); setMemberError('')
-    try { await projectMembersApi.add(projectId, { userId: Number(selectedUser), roleName: selectedRole as 'LEADER' | 'MEMBER' }); setSelectedUser(''); setMemberQuery(''); await load() }
+    try {
+      const addedMember = await projectMembersApi.add(projectId, { userId: Number(selectedUser), roleName: selectedRole as 'LEADER' | 'MEMBER' })
+      setMembers((current) => current.some((member) => member.userId === addedMember.userId)
+        ? current.map((member) => member.userId === addedMember.userId ? addedMember : member)
+        : [...current, addedMember])
+      setSelectedUser('')
+      setMemberQuery('')
+      setUserResults([])
+    }
     catch (saveError) { setMemberError(errorText(saveError)) } finally { setBusy(false) }
+  }
+
+  async function removeMember(member: ProjectMember) {
+    if (member.id === null || !window.confirm(`Remove ${member.userName} from this project?`)) return
+    setBusy(true)
+    setMemberError('')
+    try {
+      await projectMembersApi.remove(projectId, member.id)
+      setMembers((current) => current.filter((currentMember) => currentMember.id !== member.id))
+    } catch (failure) {
+      setMemberError(errorText(failure))
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function assign(taskId: number, userId: number) {
@@ -137,7 +159,7 @@ export function ProjectWorkspace({ projectId }: { projectId: number }) {
         <div className="project-workspace__heading"><div><h2>Project members</h2><p>Add existing user accounts and set their project role.</p></div></div>
         <form className="workspace-inline-form workspace-inline-form--member" onSubmit={(event) => void addMember(event)}><Input id="member-search" label="Search user accounts" value={memberQuery} onChange={(event) => { setMemberQuery(event.target.value); setSelectedUser('') }} placeholder="Name or email" /><Select id="member-user" label="User" value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)} options={[{ value: '', label: candidates.length ? 'Choose user' : 'Search for an account' }, ...candidates.map((person) => ({ value: String(person.id), label: `${person.name} · ${person.email}` }))]} /><Select id="member-role" label="Project role" value={selectedRole} onChange={(event) => setSelectedRole(event.target.value)} options={[{ value: '', label: 'Choose role' }, { value: 'MEMBER', label: 'Member' }, { value: 'LEADER', label: 'Leader' }]} /><Button type="submit" variant="primary" disabled={busy || !selectedUser || !selectedRole}>Add member</Button></form>
         {memberError && <p className="workspace-error" role="alert">{memberError}</p>}
-        {members.length === 0 ? <EmptyState title="No member records" detail="Add a member to enable task assignment." /> : <div className="workspace-list">{members.map((member) => <article className="workspace-card workspace-card--compact" key={member.id}><div className="workspace-member"><span className="workspace-avatar">{member.userName.trim().split(/\s+/).map((part) => part[0]).slice(0,2).join('').toUpperCase()}</span><div><h3>{member.userName}</h3><p>{member.roleName}</p></div></div><Button size="sm" variant="danger" disabled={busy || member.id === null} onClick={async () => { if (member.id !== null && window.confirm(`Remove ${member.userName} from this project?`)) { setBusy(true); try { await projectMembersApi.remove(projectId, member.id); await load() } catch (failure) { setMemberError(errorText(failure)) } finally { setBusy(false) } } }}>Remove</Button></article>)}</div>}
+        {members.length === 0 ? <EmptyState title="No member records" detail="Add a member to enable task assignment." /> : <div className="workspace-list">{members.map((member) => <article className="workspace-card workspace-card--compact" key={member.id}><div className="workspace-member"><span className="workspace-avatar">{member.userName.trim().split(/\s+/).map((part) => part[0]).slice(0,2).join('').toUpperCase()}</span><div><h3>{member.userName}</h3><p>{member.roleName}</p></div></div><Button size="sm" variant="danger" disabled={busy || member.id === null} onClick={() => void removeMember(member)}>Remove</Button></article>)}</div>}
       </>}
     </div>}
     <Dialog open={taskDialog} onClose={() => { if (!busy) setTaskDialog(false) }} title={editingTask ? 'Edit task' : 'Create task'} description="Task dates, status, and priority are stored by the project service.">

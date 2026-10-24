@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../app/AuthProvider'
 import { ApiError } from '../../api/client'
-import type { AiScheduleMember, AiScheduleResponse } from '../../api/models'
+import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary } from '../../api/models'
 import { aiSchedulesApi } from '../../api/services'
 import { Button } from '../../components/ui/Button'
 import { ErrorState } from '../../components/ui/States'
@@ -18,37 +18,6 @@ function isPdf(file: File) {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
-function buildSchedulePatch(original: unknown, updated: unknown): unknown | undefined {
-  if (Object.is(original, updated)) return undefined
-
-  if (Array.isArray(original) && Array.isArray(updated)) {
-    if (original.length !== updated.length) return updated
-    const changes = updated.map((value, index) => buildSchedulePatch(original[index], value))
-    return changes.some((change) => change !== undefined)
-      ? changes.map((change) => change === undefined ? null : change)
-      : undefined
-  }
-
-  if (isRecord(original) && isRecord(updated)) {
-    const patch: Record<string, unknown> = {}
-    for (const key of new Set([...Object.keys(original), ...Object.keys(updated)])) {
-      if (!(key in updated)) {
-        patch[key] = null
-        continue
-      }
-      const change = buildSchedulePatch(original[key], updated[key])
-      if (change !== undefined) patch[key] = change
-    }
-    return Object.keys(patch).length ? patch : undefined
-  }
-
-  return updated === undefined ? null : updated
-}
-
 export function AIPlannerPage() {
   const { user, status: authStatus } = useAuth()
   const [step, setStep] = useState<'upload' | 'review' | 'complete'>('upload')
@@ -62,11 +31,28 @@ export function AIPlannerPage() {
   const [memberError, setMemberError] = useState('')
   const [loadingMembers, setLoadingMembers] = useState(false)
   const [loadingSchedule, setLoadingSchedule] = useState(false)
+  const [pendingDrafts, setPendingDrafts] = useState<AiScheduleSummary[]>([])
+  const [loadingDrafts, setLoadingDrafts] = useState(true)
+  const [draftListError, setDraftListError] = useState('')
   const [working, setWorking] = useState<'idle' | 'saving' | 'approving' | 'rejecting'>('idle')
   const [actionMessage, setActionMessage] = useState('')
   const [lastDecision, setLastDecision] = useState<'Approve' | 'Reject' | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+
+  async function refreshPendingDrafts() {
+    setLoadingDrafts(true)
+    setDraftListError('')
+    try {
+      setPendingDrafts(await aiSchedulesApi.getPending())
+    } catch (requestError) {
+      setDraftListError(requestError instanceof Error ? requestError.message : 'Could not load your saved drafts.')
+    } finally {
+      setLoadingDrafts(false)
+    }
+  }
+
+  useEffect(() => { void refreshPendingDrafts() }, [])
 
   function selectFile(candidate?: File) {
     setError('')
@@ -99,9 +85,29 @@ export function AIPlannerPage() {
       setScheduleId(savedSchedule.id)
       setDraftData(JSON.parse(JSON.stringify(savedSchedule.scheduleData)))
       await loadAssignableMembers()
+      void refreshPendingDrafts()
     } catch {
       setSchedule(null)
       setError('The webhook confirmed the save, but the backend could not load the pending schedule. Retry loading the schedule or check that n8n saved it with your user ID.')
+    } finally {
+      setLoadingSchedule(false)
+    }
+  }
+
+  async function openPendingDraft(draftId: number) {
+    setLoadingSchedule(true)
+    setError('')
+    setActionMessage('')
+    try {
+      const savedSchedule = await aiSchedulesApi.getPendingById(draftId)
+      setSchedule(savedSchedule)
+      setScheduleId(savedSchedule.id)
+      setDraftData(JSON.parse(JSON.stringify(savedSchedule.scheduleData)))
+      setFile(null)
+      setStep('review')
+      await loadAssignableMembers()
+    } catch (requestError) {
+      setDraftListError(requestError instanceof Error ? requestError.message : 'Could not open this pending draft.')
     } finally {
       setLoadingSchedule(false)
     }
@@ -163,6 +169,14 @@ export function AIPlannerPage() {
   const groups = scheduleData?.newGroups ?? []
   const tasks = scheduleData?.tasks ?? []
   const hasUnsavedChanges = !!schedule && !!draftData && JSON.stringify(schedule.scheduleData) !== JSON.stringify(draftData)
+
+  function returnToDraftList() {
+    if (hasUnsavedChanges && !window.confirm('You have unsaved edits. Return to the draft list and discard these edits?')) return
+    setError('')
+    setActionMessage('')
+    setStep('upload')
+  }
+
   const visibleMembers = useMemo(() => {
     const query = memberSearch.trim().toLowerCase()
     const matches = query
@@ -170,6 +184,7 @@ export function AIPlannerPage() {
       : members
     return matches.slice(0, query ? 20 : 8)
   }, [members, memberSearch])
+  const visibleMemberIds = useMemo(() => new Set(visibleMembers.map((member) => member.id)), [visibleMembers])
 
   function patchProject(patch: Partial<NonNullable<AiScheduleResponse['scheduleData']['project']>>) {
     setActionMessage('')
@@ -226,12 +241,20 @@ export function AIPlannerPage() {
     setError('')
     setActionMessage('')
     try {
-      const schedulePatch = buildSchedulePatch(schedule.scheduleData, draftData)
-      if (isRecord(schedulePatch)) {
-        await aiSchedulesApi.patchPending(schedule.id, { scheduleData: schedulePatch })
-        setSchedule({ ...schedule, scheduleData: draftData })
+      await aiSchedulesApi.updatePending(schedule.id, { scheduleData: draftData })
+      const locallySavedSchedule = { ...schedule, scheduleData: draftData }
+      setSchedule(locallySavedSchedule)
+
+      let confirmationMessage = 'Draft saved to your account.'
+      try {
+        const persistedSchedule = await aiSchedulesApi.getPendingById(schedule.id)
+        setSchedule(persistedSchedule)
+        setDraftData(JSON.parse(JSON.stringify(persistedSchedule.scheduleData)))
+      } catch {
+        confirmationMessage = 'Draft was saved, but the server could not reload it for confirmation. Reopen the draft to verify.'
       }
-      setActionMessage('Draft saved. You can keep editing or create the project when ready.')
+      void refreshPendingDrafts()
+      setActionMessage(confirmationMessage)
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : 'Could not save this draft. Please retry.')
     } finally {
@@ -253,19 +276,14 @@ export function AIPlannerPage() {
     setError('')
     setActionMessage('')
     try {
-      const schedulePatch = buildSchedulePatch(schedule.scheduleData, draftData)
-      if (isRecord(schedulePatch)) {
-        await aiSchedulesApi.patchPending(schedule.id, { scheduleData: schedulePatch })
-        setSchedule({ ...schedule, scheduleData: draftData })
-      }
-      const result = await aiSchedulesApi.sendChatAction({
-        action: 'chat',
-        message: `${decision} ${draftData.project.name.trim()}`,
-        leaderId: user.id,
-        scheduleId: schedule.id,
-      })
+      await aiSchedulesApi.updatePending(schedule.id, { scheduleData: draftData })
+      setSchedule({ ...schedule, scheduleData: draftData })
+      const result = decision === 'Approve'
+        ? await aiSchedulesApi.approve({ scheduleId: schedule.id, leaderId: user.id })
+        : await aiSchedulesApi.reject({ scheduleId: schedule.id, reason: 'Rejected from AI Planner' })
       setLastDecision(decision)
-      setActionMessage(result.message || `${decision} request sent to n8n.`)
+      setActionMessage(result.message || (decision === 'Approve' ? 'Project created from the approved schedule.' : 'Schedule rejected.'))
+      setPendingDrafts((current) => current.filter((draft) => draft.id !== schedule.id))
       setStep('complete')
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : `Could not send the ${decision.toLowerCase()} request. Please review the fields and retry.`)
@@ -299,11 +317,36 @@ export function AIPlannerPage() {
         <li className={step === 'complete' ? 'planner-step--current' : ''}>
           <span aria-current={step === 'complete' ? 'step' : undefined}>
             <span className="planner-step__number">3</span>
-            <span><strong>Decision sent</strong><small>n8n workflow</small></span>
+            <span><strong>Decision complete</strong><small>Project schedule</small></span>
           </span>
         </li>
       </ol>
     </nav>
+
+    {step === 'upload' && <section className="content-panel planner-pending-drafts" aria-labelledby="pending-drafts-heading">
+      <div className="panel-heading">
+        <div><h2 id="pending-drafts-heading">Saved drafts</h2><p>Continue reviewing a schedule that is still pending.</p></div>
+        <Button variant="ghost" size="sm" disabled={loadingDrafts} onClick={() => void refreshPendingDrafts()}>
+          {loadingDrafts ? 'Refreshing…' : 'Refresh'}
+        </Button>
+      </div>
+      {draftListError && <div className="planner-pending-drafts__error"><ErrorState title="Could not load drafts" detail={draftListError} action={<Button variant="secondary" disabled={loadingDrafts} onClick={() => void refreshPendingDrafts()}>Try again</Button>} /></div>}
+      {loadingDrafts && <p className="planner-pending-loading" role="status">Loading your pending drafts…</p>}
+      {!loadingDrafts && !draftListError && pendingDrafts.length === 0 && <p className="planner-pending-drafts__empty">No saved drafts are waiting for review.</p>}
+      {!draftListError && pendingDrafts.length > 0 && <div className="planner-pending-drafts__list">
+        {pendingDrafts.map((draft) => <article className="planner-pending-draft" key={draft.id}>
+          <span className="planner-pending-draft__icon"><Icon name="sparkles" /></span>
+          <div className="planner-pending-draft__details">
+            <strong>{draft.projectName || 'Untitled project'}</strong>
+            <span>Draft #{draft.id} · {new Date(draft.createdAt).toLocaleString()}</span>
+          </div>
+          <span className="planner-pending-draft__counts">{draft.totalTasks} tasks · {draft.totalGroups} groups</span>
+          <Button variant="secondary" size="sm" disabled={loadingSchedule} onClick={() => void openPendingDraft(draft.id)}>
+            {loadingSchedule ? 'Opening…' : 'Open draft'}
+          </Button>
+        </article>)}
+      </div>}
+    </section>}
 
     {step === 'upload' ? <section className="content-panel planner-step-card" aria-labelledby="planner-input-heading">
       <div className="panel-heading">
@@ -329,7 +372,7 @@ export function AIPlannerPage() {
         {error && <ErrorState title="Schedule generation failed" detail={error} />}
       </div>
     </section> : step === 'complete' ? <section className="content-panel planner-step-card" aria-labelledby="planner-complete-heading">
-      <div className="panel-heading"><div><h2 id="planner-complete-heading">{lastDecision === 'Reject' ? 'Rejection sent' : 'Approval sent'}</h2><p>The edited schedule was saved, then your decision was sent to the n8n workflow.</p></div><StatusBadge tone="green">Sent to n8n</StatusBadge></div>
+      <div className="panel-heading"><div><h2 id="planner-complete-heading">{lastDecision === 'Reject' ? 'Schedule rejected' : 'Project created'}</h2><p>The edited schedule was saved and the decision was processed by the project service.</p></div><StatusBadge tone="green">Completed</StatusBadge></div>
       <div className="planner-step-card__body">
         <p className="team-members-feedback team-members-feedback--success" role="status"><strong>{actionMessage}</strong></p>
         <div className="planner-step-card__actions">
@@ -340,7 +383,10 @@ export function AIPlannerPage() {
     </section> : <section className="content-panel planner-step-card" aria-labelledby="planner-review-heading">
       <div className="panel-heading">
         <div><h2 id="planner-review-heading">Review your AI schedule</h2><p>Edit the project plan, add team members, then save changes or send an approval decision.</p></div>
-        <StatusBadge tone="amber">Pending review</StatusBadge>
+        <div className="panel-heading__actions">
+          <Button variant="secondary" size="sm" onClick={returnToDraftList}>Back to drafts</Button>
+          <StatusBadge tone="amber">Pending review</StatusBadge>
+        </div>
       </div>
       <div className="planner-step-card__body">
         <div className="planner-review-intro">
@@ -373,8 +419,7 @@ export function AIPlannerPage() {
             <div className="planner-edit-section__heading"><div><h3 id="groups-heading">Groups & members</h3><p>Choose who belongs to each project group.</p></div><span className="planner-edit-section__step">03</span></div>
             <div className="planner-edit-stack">
               {groups.map((group, groupIndex) => {
-                const selectedMembers = members.filter((member) => group.memberIds?.includes(member.id))
-                const listedMembers = [...selectedMembers, ...visibleMembers.filter((member) => !group.memberIds?.includes(member.id))]
+                const listedMembers = members.filter((member) => group.memberIds?.includes(member.id) || visibleMemberIds.has(member.id))
                 const groupTaskCount = tasks.filter((task) => task.groupTempId === group.tempId).length
                 return <article className="planner-group-editor" key={group.tempId}>
                   <div className="planner-group-editor__top"><Input id={`ai-group-${groupIndex}`} label="Group name" value={group.name} onChange={(event) => patchGroup(groupIndex, { name: event.target.value })} maxLength={100} disabled={working !== 'idle'} /><span className="planner-group-editor__count">{groupTaskCount} tasks</span></div>
@@ -390,8 +435,7 @@ export function AIPlannerPage() {
             <div className="planner-edit-section__heading"><div><h3 id="tasks-heading">Tasks & assignments</h3><p>Adjust dates, priority, group and owners for each task.</p></div><span className="planner-edit-section__step">04</span></div>
             <div className="planner-task-edit-list">
               {tasks.map((task, taskIndex) => {
-                const selectedMembers = members.filter((member) => task.assigneeIds?.includes(member.id))
-                const listedMembers = [...selectedMembers, ...visibleMembers.filter((member) => !task.assigneeIds?.includes(member.id))]
+                const listedMembers = members.filter((member) => task.assigneeIds?.includes(member.id) || visibleMemberIds.has(member.id))
                 return <details className="planner-task-editor" key={`${task.title}-${taskIndex}`}>
                   <summary><span className="planner-task-editor__title"><strong>{task.title || `Task ${taskIndex + 1}`}</strong><small>{task.startDate || 'No start'} → {task.endDate || 'No end'}</small></span><span className={`schedule-preview__priority schedule-preview__priority--${(task.priority || 'medium').toLowerCase()}`}>{task.priority || 'medium'}</span></summary>
                   <div className="planner-task-editor__body">
@@ -420,7 +464,7 @@ export function AIPlannerPage() {
           <div className="planner-review-footer__actions">
             <Button variant="danger" disabled={working !== 'idle' || !draftData} onClick={() => void sendDecision('Reject')}>{working === 'rejecting' ? 'Sending rejection…' : 'Reject'}</Button>
             <Button variant="secondary" disabled={working !== 'idle'} onClick={() => void saveDraft()}>{working === 'saving' ? 'Saving draft…' : 'Save draft'}</Button>
-            <Button variant="primary" disabled={working !== 'idle' || !draftData} onClick={() => void sendDecision('Approve')}>{working === 'approving' ? 'Sending approval…' : 'Approve via n8n'}</Button>
+            <Button variant="primary" disabled={working !== 'idle' || !draftData} onClick={() => void sendDecision('Approve')}>{working === 'approving' ? 'Approving…' : 'Approve schedule'}</Button>
           </div>
         </div>}
       </div>
