@@ -15,6 +15,7 @@ type AuthContextValue = {
   logout: () => Promise<void>
   expireSession: () => void
   refresh: () => Promise<void>
+  updateCurrentUser: (user: UserResponse) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -51,6 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const updateCurrentUser = useCallback((updatedUser: UserResponse) => {
+    setUser(updatedUser)
+    setStatus('ready')
+    setError('')
+  }, [])
+
   useEffect(() => { void refresh() }, [refresh])
 
   const login = useCallback(async (credentials: LoginRequest) => {
@@ -75,6 +82,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError('')
   }, [])
 
+  useEffect(() => {
+    const handleUnauthorized = () => expireSession()
+    window.addEventListener('app:unauthorized', handleUnauthorized)
+    return () => window.removeEventListener('app:unauthorized', handleUnauthorized)
+  }, [expireSession])
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout()
@@ -88,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const value = useMemo(() => ({ user, status, error, registrationSucceeded, login, register, clearRegistrationNotice, logout, expireSession, refresh }), [user, status, error, registrationSucceeded, login, register, clearRegistrationNotice, logout, expireSession, refresh])
+  const value = useMemo(() => ({ user, status, error, registrationSucceeded, login, register, clearRegistrationNotice, logout, expireSession, refresh, updateCurrentUser }), [user, status, error, registrationSucceeded, login, register, clearRegistrationNotice, logout, expireSession, refresh, updateCurrentUser])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

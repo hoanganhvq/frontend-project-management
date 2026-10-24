@@ -63,13 +63,13 @@ export const initialDemoWorkspace: DemoWorkspace = {
   tasks: [
     { id: 1001, projectId: 101, groupId: null, parentTaskId: null, title: 'Review sprint goals', description: 'Confirm the goals and acceptance criteria for the current sprint.', startDate: demoDate(-10), endDate: demoDate(-7), progress: 45, priority: 'high', status: 'in_progress', boardColumn: 'in_progress', assigneeName: 'Maya Chen', module: 'Planning', estimateHours: 6, dependencyIds: [], createdByName: 'Maya Chen', createdAt: new Date().toISOString() },
     { id: 1002, projectId: 101, groupId: null, parentTaskId: null, title: 'Validate checkout requirements', description: 'Review the checkout requirements and identify open questions.', startDate: demoDate(-6), endDate: demoDate(2), progress: 0, priority: 'medium', status: 'todo', boardColumn: 'todo', assigneeName: 'Noah Williams', module: 'Checkout', estimateHours: 8, dependencyIds: [1001], createdByName: 'Maya Chen', createdAt: new Date().toISOString() },
-    { id: 1003, projectId: 102, groupId: null, parentTaskId: null, title: 'Prepare design handoff', description: 'Package the approved mobile app design notes for handoff.', startDate: demoDate(-4), endDate: demoDate(3), progress: 0, priority: 'medium', status: 'todo', boardColumn: 'review', assigneeName: 'Priya Shah', module: 'Design', estimateHours: 12, dependencyIds: [], createdByName: 'Maya Chen', createdAt: new Date().toISOString() },
+    { id: 1003, projectId: 102, groupId: null, parentTaskId: null, title: 'Prepare design handoff', description: 'Package the approved mobile app design notes for handoff.', startDate: demoDate(-4), endDate: demoDate(3), progress: 0, priority: 'medium', status: 'in_progress', boardColumn: 'in_progress', assigneeName: 'Priya Shah', module: 'Design', estimateHours: 12, dependencyIds: [], createdByName: 'Maya Chen', createdAt: new Date().toISOString() },
     { id: 1004, projectId: 102, groupId: null, parentTaskId: null, title: 'Finalize design tokens', description: 'Review shared color, spacing, and type tokens.', startDate: demoDate(-15), endDate: demoDate(-13), progress: 100, priority: 'low', status: 'done', boardColumn: 'done', assigneeName: 'Liam Kim', module: 'Design', estimateHours: 4, dependencyIds: [], createdByName: 'Maya Chen', createdAt: new Date().toISOString() },
     { id: 1005, projectId: 103, groupId: null, parentTaskId: null, title: 'Confirm migration window', description: 'Document the sample migration window and rollback steps.', startDate: demoDate(-45), endDate: demoDate(-40), progress: 100, priority: 'high', status: 'done', boardColumn: 'done', assigneeName: 'Jordan Lee', module: 'Migration', estimateHours: 5, dependencyIds: [], createdByName: 'Maya Chen', createdAt: new Date().toISOString() },
     demoTask(1006, 101, 'Requirements validation', -20, -16, 'done', 'done', 100, 'high', 'Maya Chen', 'Planning', 10),
     demoTask(1007, 101, 'System architecture', -15, -10, 'done', 'done', 100, 'high', 'Noah Williams', 'Architecture', 16, [1006]),
     demoTask(1008, 101, 'Build authentication endpoints', 3, 12, 'todo', 'todo', 0, 'high', 'Liam Kim', 'Backend', 20, [1007, 1002]),
-    demoTask(1009, 101, 'Create responsive navigation', 3, 9, 'todo', 'review', 70, 'medium', 'Priya Shah', 'Frontend', 12, [1002]),
+    demoTask(1009, 101, 'Create responsive navigation', 3, 9, 'in_progress', 'in_progress', 70, 'medium', 'Priya Shah', 'Frontend', 12, [1002]),
     demoTask(1010, 101, 'Payment service integration', 13, 18, 'todo', 'todo', 0, 'high', 'Jordan Lee', 'Integration', 18, [1008, 1009]),
     demoTask(1011, 101, 'Integration testing', 19, 23, 'todo', 'todo', 0, 'medium', 'Noah Williams', 'Quality', 14, [1010]),
     demoTask(1012, 101, 'Production deployment', 24, 26, 'todo', 'todo', 0, 'medium', 'Maya Chen', 'Release', 8, [1011]),
@@ -118,7 +118,7 @@ export function isDemoWorkspace(value: unknown): value is DemoWorkspace {
     && typeof (item as DemoWorkspace['tasks'][number]).title === 'string'
     && ['todo', 'in_progress', 'done', 'canceled'].includes((item as DemoWorkspace['tasks'][number]).status)
     && ['low', 'medium', 'high'].includes((item as DemoWorkspace['tasks'][number]).priority)
-    && ((item as DemoWorkspace['tasks'][number]).boardColumn === undefined || ['todo', 'in_progress', 'review', 'done'].includes((item as DemoWorkspace['tasks'][number]).boardColumn!))
+    && ((item as DemoWorkspace['tasks'][number]).boardColumn === undefined || ['todo', 'in_progress', 'done'].includes((item as DemoWorkspace['tasks'][number]).boardColumn!))
   const profile = candidate.profile as DemoWorkspace['profile'] | undefined
   const preferences = candidate.preferences as DemoWorkspace['preferences'] | undefined
   return Array.isArray(candidate.projects) && candidate.projects.every(validProject)

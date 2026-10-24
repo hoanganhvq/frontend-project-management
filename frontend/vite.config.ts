@@ -11,6 +11,11 @@ export default defineConfig(({ mode }) => {
           target: env.VITE_API_PROXY_TARGET || 'http://localhost:8090',
           changeOrigin: true,
         },
+        '/n8n': {
+          target: env.VITE_N8N_PROXY_TARGET || 'http://localhost:5678',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/n8n/, ''),
+        },
       },
     },
   }

@@ -21,9 +21,13 @@ async function readError(response: Response): Promise<unknown> {
 
 async function executeRequest<T>(path: string, init: RequestInit): Promise<T> {
   const headers = new Headers(init.headers)
-  if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
+  if (init.body && !isFormData && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, credentials: 'include' })
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('app:unauthorized'))
+    }
     const details = await readError(response)
     const payload = details && typeof details === 'object' ? details as Record<string, unknown> : null
     const detailMessage = typeof details === 'string' ? details : payload

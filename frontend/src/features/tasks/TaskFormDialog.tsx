@@ -16,7 +16,7 @@ type Props = {
   task?: Task
   initialBoardColumn?: TaskBoardColumn
   onClose: () => void
-  onSave: (task: TaskValues) => void
+  onSave: (task: TaskValues) => void | Promise<void>
 }
 
 function initialValues(projectId: number, task?: Task, initialBoardColumn: TaskBoardColumn = 'todo'): TaskValues {
@@ -29,9 +29,11 @@ export function TaskFormDialog({ open, projectId, task, initialBoardColumn, onCl
   const [groups, setGroups] = useState<ProjectGroup[]>([])
   const [values, setValues] = useState<TaskValues>(() => initialValues(projectId, task, initialBoardColumn))
   const [dateError, setDateError] = useState('')
+  const [saveError, setSaveError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (open) { setValues(initialValues(projectId, task, initialBoardColumn)); setDateError('') }
+    if (open) { setValues(initialValues(projectId, task, initialBoardColumn)); setDateError(''); setSaveError('') }
   }, [open, projectId, task, initialBoardColumn])
 
   useEffect(() => {
@@ -41,14 +43,22 @@ export function TaskFormDialog({ open, projectId, task, initialBoardColumn, onCl
     return () => { active = false }
   }, [open, projectId])
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (values.endDate && values.startDate && values.endDate < values.startDate) {
       setDateError('Due date must be on or after the start date.')
       return
     }
     setDateError('')
-    onSave({ ...values, title: values.title.trim(), description: values.description.trim() })
+    setSaveError('')
+    setSaving(true)
+    try {
+      await onSave({ ...values, title: values.title.trim(), description: values.description.trim() })
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'The task could not be saved.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return <Dialog open={open} onClose={onClose} title={task ? 'Edit task' : 'Create task'} description="This change is saved to the project server.">
@@ -68,7 +78,8 @@ export function TaskFormDialog({ open, projectId, task, initialBoardColumn, onCl
         <Select label="Priority" id="task-priority" value={values.priority} onChange={(event) => setValues({ ...values, priority: event.target.value as TaskPriority })} options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]} />
       </div>
       <FormField label="Progress" htmlFor="task-progress" hint="Percentage complete (0–100)."><Input id="task-progress" type="number" min={0} max={100} value={values.progress} onChange={(event) => setValues({ ...values, progress: Number(event.target.value) })} /></FormField>
+      {saveError && <p className="team-members-feedback team-members-feedback--error" role="alert">{saveError}</p>}
     </form>
-    <div className="dialog__actions"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" form="task-form">{task ? 'Save changes' : 'Create task'}</Button></div>
+    <div className="dialog__actions"><Button variant="secondary" disabled={saving} onClick={onClose}>Cancel</Button><Button variant="primary" disabled={saving} type="submit" form="task-form">{saving ? 'Saving…' : task ? 'Save changes' : 'Create task'}</Button></div>
   </Dialog>
 }

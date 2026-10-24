@@ -16,7 +16,7 @@ type Props = {
   anchorDate: Date
   focusToday: boolean
   onTaskSelect: (taskId: number) => void
-  onUpdateTask: (taskId: number, changes: Omit<Partial<Task>, 'id' | 'projectId'>) => void
+  onUpdateTask: (taskId: number, changes: Omit<Partial<Task>, 'id' | 'projectId'>) => void | Promise<void>
 }
 
 function addCalendarDays(value: Date, days: number): Date {
@@ -27,7 +27,6 @@ function addCalendarDays(value: Date, days: number): Date {
 
 function taskColor(task: Task): string {
   if (task.boardColumn === 'done' || task.status === 'done') return 'timeline-gantt-task--done'
-  if (task.boardColumn === 'review') return 'timeline-gantt-task--review'
   if (task.boardColumn === 'in_progress' || task.status === 'in_progress') return 'timeline-gantt-task--active'
   return 'timeline-gantt-task--todo'
 }
@@ -99,7 +98,7 @@ export function DhtmlxGanttTimeline({ projectName, tasks, milestones, zoom, anch
       if (!task.start_date || !task.end_date) return
       const startDate = formatLocalDateOnly(task.start_date)
       const endDate = fromGanttEndDate(task.end_date)
-      if (parseLocalDateOnly(startDate) && parseLocalDateOnly(endDate)) onUpdateTask(taskId, { startDate, endDate })
+      if (parseLocalDateOnly(startDate) && parseLocalDateOnly(endDate)) void Promise.resolve(onUpdateTask(taskId, { startDate, endDate })).catch(() => undefined)
     }))
 
     const syncDependencyTarget = (target: string | number) => {
@@ -108,7 +107,7 @@ export function DhtmlxGanttTimeline({ projectName, tasks, milestones, zoom, anch
       const dependencyIds = gantt.getLinks()
         .filter((link) => link.target === target && typeof link.source === 'number' && taskIdsByGanttIdRef.current.has(link.source))
         .map((link) => link.source as number)
-      onUpdateTask(taskId, { dependencyIds })
+      void Promise.resolve(onUpdateTask(taskId, { dependencyIds })).catch(() => undefined)
     }
     eventIds.push(gantt.attachEvent('onLinkValidation', (link: GanttLink) => {
       return link.source !== link.target
@@ -154,12 +153,12 @@ export function DhtmlxGanttTimeline({ projectName, tasks, milestones, zoom, anch
 
   return <section className="content-panel gantt-panel timeline-gantt-panel" aria-label="Project Gantt schedule">
     <div className="gantt-panel__heading">
-      <div><h2>{projectName}</h2><p>{scheduledCount} scheduled tasks · {mapped.links.length} demo dependencies · browser data only</p></div>
+      <div><h2>{projectName}</h2><p>{scheduledCount} scheduled tasks · {mapped.links.length} server dependencies</p></div>
     </div>
     {tasks.length === 0 ? <EmptyState title="No tasks in this project" detail="Add demo tasks to see them on the timeline." /> : <>
       <div ref={hostRef} className="timeline-gantt-host" role="region" aria-label="Interactive, horizontally scrollable project Gantt chart" tabIndex={0} />
       {mapped.unscheduledTaskIds.length > 0 && <p className="timeline-gantt-note" role="status">{mapped.unscheduledTaskIds.length} task{mapped.unscheduledTaskIds.length === 1 ? '' : 's'} omitted because a valid start and end date are not available. No dates were assigned.</p>}
-      <p className="timeline-gantt-note">Drag or resize a task bar to change its dates. New or changed dependencies and dates are saved to this browser demo only. Select a task row or bar to open its shared task details.</p>
+      <p className="timeline-gantt-note">Drag or resize a task bar to save its dates. Add or remove dependency links to update the server schedule. Select a task row or bar to open its details.</p>
     </>}
   </section>
 }

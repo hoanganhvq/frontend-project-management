@@ -10,6 +10,7 @@ type TaskValues = Omit<Task, 'id' | 'createdAt' | 'createdByName'>
 type User = { id: number; name: string; email: string; position?: string | null }
 type WorkspaceContextValue = {
   workspace: DemoWorkspace
+  workspaceStatus: 'loading' | 'ready' | 'error'
   persistenceNotice: string | null
   user: User
   refresh: () => Promise<void>
@@ -36,7 +37,7 @@ const emptyWorkspace = (user: User): DemoWorkspace => ({
 
 function mapProject(project: ProjectResponse): Project {
   const status: ProjectStatus = project.status === 'completed' || project.status === 'cancelled' ? project.status : 'in_progress'
-  return { id: project.id, name: project.name, description: project.description ?? '', startDate: project.startDate ?? '', endDate: project.endDate ?? '', status }
+  return { id: project.id, ownerId: project.owner?.id, name: project.name, description: project.description ?? '', startDate: project.startDate ?? '', endDate: project.endDate ?? '', status }
 }
 
 function mapTask(task: TaskResponse): Task {
@@ -52,6 +53,7 @@ function mapTask(task: TaskResponse): Task {
 export function DemoWorkspaceProvider({ user, children }: { user: User; children: ReactNode }) {
   const { expireSession } = useAuth()
   const [workspace, setWorkspace] = useState(() => emptyWorkspace(user))
+  const [workspaceStatus, setWorkspaceStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [persistenceNotice, setPersistenceNotice] = useState<string | null>(null)
   const workspaceRef = useRef(workspace)
   const reportError = useCallback((error: unknown) => {
@@ -78,7 +80,11 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
       workspaceRef.current = next
       setWorkspace(next)
       setPersistenceNotice(null)
-    } catch (error) { reportError(error) }
+      setWorkspaceStatus('ready')
+    } catch (error) {
+      reportError(error)
+      setWorkspaceStatus('error')
+    }
   }, [reportError])
 
   useEffect(() => { void refresh() }, [refresh])
@@ -93,7 +99,7 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
 
   const updateProject = useCallback(async (id: number, changes: Omit<Partial<Project>, 'id'>) => {
     const previous = workspaceRef.current.projects.find((item) => item.id === id)
-    if (!previous) return
+    if (!previous) throw new Error('This project is no longer available. Refresh the page and try again.')
     try {
       await projectsApi.update(id, {
         name: changes.name ?? previous.name, description: changes.description ?? previous.description,
@@ -101,11 +107,11 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
         status: changes.status ?? previous.status,
       })
       await refresh()
-    } catch (error) { reportError(error) }
+    } catch (error) { reportError(error); throw error }
   }, [refresh, reportError])
 
   const deleteProject = useCallback(async (id: number) => {
-    try { await projectsApi.delete(id); await refresh() } catch (error) { reportError(error) }
+    try { await projectsApi.delete(id); await refresh() } catch (error) { reportError(error); throw error }
   }, [refresh, reportError])
 
   const createTask = useCallback(async (task: TaskValues) => {
@@ -122,7 +128,7 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
 
   const updateTask = useCallback(async (id: number, changes: Omit<Partial<Task>, 'id' | 'projectId'>) => {
     const task = workspaceRef.current.tasks.find((item) => item.id === id)
-    if (!task) return
+    if (!task) throw new Error('This task is no longer available. Refresh the page and try again.')
     const status = changes.status ?? (changes.boardColumn === 'done' ? 'done' : changes.boardColumn === 'todo' ? 'todo' : changes.boardColumn ? 'in_progress' : task.status)
     try {
       await tasksApi.update(id, {
@@ -132,18 +138,18 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
         progress: changes.progress ?? (status === 'done' ? 100 : task.progress), priority: changes.priority ?? task.priority, status,
       })
       await refresh()
-    } catch (error) { reportError(error) }
+    } catch (error) { reportError(error); throw error }
   }, [refresh, reportError])
 
   const deleteTask = useCallback(async (id: number) => {
-    try { await tasksApi.delete(id); await refresh() } catch (error) { reportError(error) }
+    try { await tasksApi.delete(id); await refresh() } catch (error) { reportError(error); throw error }
   }, [refresh, reportError])
   const previewOnly = useCallback(() => undefined, [])
   const value = useMemo<WorkspaceContextValue>(() => ({
-    workspace, persistenceNotice, user, refresh, createProject, updateProject, deleteProject,
+    workspace, workspaceStatus, persistenceNotice, user, refresh, createProject, updateProject, deleteProject,
     createTask, updateTask, deleteTask, addMilestones: previewOnly, markNotificationRead: previewOnly,
     markAllNotificationsRead: previewOnly, updateProfile: previewOnly, updatePreferences: previewOnly, resetDemoWorkspace: previewOnly,
-  }), [workspace, persistenceNotice, user, refresh, createProject, updateProject, deleteProject, createTask, updateTask, deleteTask, previewOnly])
+  }), [workspace, workspaceStatus, persistenceNotice, user, refresh, createProject, updateProject, deleteProject, createTask, updateTask, deleteTask, previewOnly])
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }

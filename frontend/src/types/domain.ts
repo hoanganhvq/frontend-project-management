@@ -1,10 +1,11 @@
 export type ProjectStatus = 'in_progress' | 'completed' | 'cancelled'
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'canceled'
 export type TaskPriority = 'low' | 'medium' | 'high'
-export type TaskBoardColumn = 'todo' | 'in_progress' | 'review' | 'done'
+export type TaskBoardColumn = 'todo' | 'in_progress' | 'done'
 
 export type Project = {
   id: number
+  ownerId?: number
   name: string
   description: string
   startDate: string
@@ -88,6 +89,5 @@ export function projectStatusLabel(status: ProjectStatus): string {
 export function taskBoardColumn(task: Task): TaskBoardColumn {
   if (task.boardColumn) return task.boardColumn
   if (task.status === 'done') return 'done'
-  if (task.status === 'in_progress') return 'in_progress'
-  return 'todo'
+  return task.status === 'todo' ? 'todo' : 'in_progress'
 }

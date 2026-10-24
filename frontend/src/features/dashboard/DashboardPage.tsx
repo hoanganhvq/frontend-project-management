@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ApiError } from '../../api/client'
-import { projectsApi, tasksApi } from '../../api/services'
-import type { ProjectResponse, TaskResponse } from '../../api/models'
+import { useMemo } from 'react'
 import { useAuth } from '../../app/AuthProvider'
+import { useDemoWorkspace } from '../../app/DemoWorkspaceProvider'
 import { navigate } from '../../app/router'
 import { Button } from '../../components/ui/Button'
 import { Icon } from '../../components/ui/Icon'
@@ -12,56 +10,18 @@ import { EmptyState, ErrorState, LoadingState } from '../../components/ui/States
 import { formatDate, projectTone, taskTone } from '../../lib/format'
 import { projectStatusLabel, taskStatusLabel, type ProjectStatus, type TaskStatus } from '../../types/domain'
 
-type DashboardData = { projects: ProjectResponse[]; tasks: TaskResponse[] }
-
-function normalizeProjectStatus(status: string): ProjectStatus {
+function normalizeProjectStatus(status: ProjectStatus): ProjectStatus {
   return status === 'completed' || status === 'cancelled' ? status : 'in_progress'
 }
 
-function normalizeTaskStatus(status: string): TaskStatus {
+function normalizeTaskStatus(status: TaskStatus): TaskStatus {
   return status === 'done' || status === 'in_progress' || status === 'canceled' ? status : 'todo'
 }
 
-function errorText(error: unknown): string {
-  if (error instanceof ApiError && error.status >= 500) return 'The project service could not load your dashboard. Please try again shortly.'
-  if (error instanceof ApiError && error.status === 403) return 'Your account cannot access this project data.'
-  return error instanceof Error ? error.message : 'Could not load dashboard data. Please try again.'
-}
-
 export function DashboardPage() {
-  const { user, expireSession } = useAuth()
-  const [data, setData] = useState<DashboardData>({ projects: [], tasks: [] })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [reloadKey, setReloadKey] = useState(0)
-
-  const loadDashboard = useCallback(async (signal: AbortSignal) => {
-    setLoading(true)
-    setError('')
-    try {
-      const projects = await projectsApi.getAll()
-      const taskGroups = await Promise.all(projects.map((project) => tasksApi.getByProject(project.id)))
-      if (signal.aborted) return
-      setData({ projects, tasks: taskGroups.flat() })
-    } catch (loadError) {
-      if (!signal.aborted) {
-        if (loadError instanceof ApiError && loadError.status === 401) {
-          expireSession()
-          setError('Your session expired. Sign in again to continue.')
-        } else {
-          setError(errorText(loadError))
-        }
-      }
-    } finally {
-      if (!signal.aborted) setLoading(false)
-    }
-  }, [expireSession])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    void loadDashboard(controller.signal)
-    return () => controller.abort()
-  }, [loadDashboard, reloadKey])
+  const { user } = useAuth()
+  const { workspace, workspaceStatus, refresh } = useDemoWorkspace()
+  const data = { projects: workspace.projects, tasks: workspace.tasks }
 
   const activeProjects = useMemo(() => data.projects.filter((project) => normalizeProjectStatus(project.status) === 'in_progress'), [data.projects])
   const openTasks = useMemo(() => data.tasks.filter((task) => {
@@ -79,7 +39,7 @@ export function DashboardPage() {
   return <div className="dashboard-page">
     <PageHeader eyebrow="WORKSPACE OVERVIEW" title={`Good ${greeting}, ${firstName}`} description="A current view of projects and tasks you can access." actions={<Button variant="primary" onClick={() => navigate('/projects')}>Browse projects <Icon name="arrow" /></Button>} />
 
-    {loading ? <LoadingState label="Loading your projects and tasks…" /> : error ? <ErrorState title="Dashboard could not load" detail={error} action={<Button variant="secondary" onClick={() => setReloadKey((key) => key + 1)}>Try again</Button>} /> : <>
+    {workspaceStatus === 'loading' ? <LoadingState label="Loading your projects and tasks…" /> : workspaceStatus === 'error' ? <ErrorState title="Dashboard could not load" detail="The project service could not load your workspace. Check the connection and retry." action={<Button variant="secondary" onClick={() => void refresh()}>Try again</Button>} /> : <>
       <section className="metric-grid" aria-label="Project and task summary">
         <article className="metric-card"><span>Active projects</span><strong>{activeProjects.length}</strong><small>Projects in progress</small></article>
         <article className="metric-card"><span>Open tasks</span><strong>{openTasks.length}</strong><small>To do or in progress</small></article>
