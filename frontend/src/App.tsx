@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './app/AuthProvider'
 import { DemoWorkspaceProvider } from './app/DemoWorkspaceProvider'
-import { useAppRoute, navigate } from './app/router'
+import { useAppRoute, navigate, taskDetailSourcePath } from './app/router'
 import { AppShell } from './components/layout/AppShell'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { ProjectsPage, ProjectDetailPage } from './features/projects/ProjectsPage'
@@ -34,7 +34,19 @@ const pageMeta = {
 function RoutedApp() {
   const route = useAppRoute()
   const { user, status, error: authError, refresh } = useAuth()
-  const [activePage, pageTitle] = pageMeta[route.page]
+  const [defaultActivePage, pageTitle] = pageMeta[route.page]
+  const taskSourcePath = route.page === 'task-detail'
+    ? taskDetailSourcePath(`${window.location.pathname}${window.location.search}`)
+    : ''
+  const activePage = route.page === 'task-detail'
+    ? /^\/projects\/\d+$/.test(taskSourcePath)
+      ? 'Projects'
+      : taskSourcePath === '/timeline'
+        ? 'Timeline'
+        : taskSourcePath === '/dashboard'
+          ? 'Dashboard'
+          : 'Task board'
+    : defaultActivePage
 
   useEffect(() => {
     if (status !== 'ready') return

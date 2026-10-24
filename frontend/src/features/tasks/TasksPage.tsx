@@ -3,7 +3,7 @@ import { ApiError } from '../../api/client'
 import { groupsApi, projectMembersApi, tasksApi } from '../../api/services'
 import type { ProjectGroup, ProjectMember, TaskAssignee, TaskDependency } from '../../api/models'
 import { useDemoWorkspace } from '../../app/DemoWorkspaceProvider'
-import { navigate } from '../../app/router'
+import { navigate, taskDetailPath, taskDetailReturnPath } from '../../app/router'
 import { Button } from '../../components/ui/Button'
 import { Dialog } from '../../components/ui/Dialog'
 import { Icon } from '../../components/ui/Icon'
@@ -12,7 +12,7 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { Select } from '../../components/ui/Select'
 import { ErrorState, LoadingState } from '../../components/ui/States'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { formatDate, priorityTone, taskTone, toLocalDateInput } from '../../lib/format'
+import { formatDate, formatDateRange, priorityTone, taskTone, toLocalDateInput } from '../../lib/format'
 import { taskStatusLabel } from '../../types/domain'
 import { taskBoardColumn } from '../../types/domain'
 import type { Task, TaskBoardColumn } from '../../types/domain'
@@ -123,8 +123,8 @@ export function TasksPage() {
             const overdue = !!task.endDate && task.endDate < today && task.status !== 'done'
             const dueSoon = !!task.endDate && task.endDate >= today && task.endDate <= soon && task.status !== 'done'
             return <article className="task-card" key={task.id} draggable onDragStart={(event) => { event.dataTransfer.setData('text/plain', String(task.id)); event.dataTransfer.effectAllowed = 'move' }}>
-              <div className="task-card__top"><StatusBadge tone={priorityTone(task.priority)}>{task.priority}</StatusBadge><Button variant="ghost" size="sm" aria-label={`Edit ${task.title}`} onClick={() => setEditTask(task)}>Edit</Button></div>
-              <button className="task-card__title" type="button" onClick={() => navigate(`/tasks/${task.id}`)}>{task.title}</button>
+              <div className="task-card__top"><StatusBadge tone={priorityTone(task.priority)}>{task.priority[0].toUpperCase() + task.priority.slice(1)}</StatusBadge><Button variant="ghost" size="sm" aria-label={`Edit ${task.title}`} onClick={() => setEditTask(task)}>Edit</Button></div>
+              <button className="task-card__title" type="button" onClick={() => navigate(taskDetailPath(task.id, '/tasks'))}>{task.title}</button>
               <span className="task-card__project">{project?.name ?? 'Project unavailable'}{task.groupId ? ` · ${groupNames[task.groupId] ?? 'Group unavailable'}` : ''}</span>
               <div className="task-card__meta"><span>{assigneeNames[task.id] || 'Unassigned'}</span><span>{task.endDate ? formatDate(task.endDate) : 'No due date'}</span></div>
               {(overdue || dueSoon) && <span className={`task-risk${overdue ? ' task-risk--overdue' : ''}`}>{overdue ? 'Overdue' : 'Due soon'}</span>}
@@ -144,6 +144,8 @@ export function TasksPage() {
 export function TaskDetailPage({ id }: { id: number }) {
   const { workspace, workspaceStatus, refresh, updateTask, deleteTask } = useDemoWorkspace()
   const task = workspace.tasks.find((item) => item.id === id)
+  const returnPath = taskDetailReturnPath(`${window.location.pathname}${window.location.search}`)
+  const returnLabel = /^\/projects\/\d+$/.test(returnPath) ? 'Project detail' : /^\/tasks\/\d+/.test(returnPath) ? 'Previous task' : returnPath === '/timeline' ? 'Timeline' : returnPath === '/dashboard' ? 'Dashboard' : 'Task board'
   const [editing, setEditing] = useState(false)
   const [assignees, setAssignees] = useState<TaskAssignee[]>([])
   const [dependencies, setDependencies] = useState<TaskDependency[]>([])
@@ -215,7 +217,7 @@ export function TaskDetailPage({ id }: { id: number }) {
     setDeleting(true)
     try {
       await deleteTask(id)
-      navigate('/tasks')
+      navigate(returnPath)
     } catch (error) {
       setDeleteError(error instanceof Error ? error.message : 'The task could not be deleted.')
     } finally {
@@ -225,26 +227,44 @@ export function TaskDetailPage({ id }: { id: number }) {
 
   if (!task && workspaceStatus === 'loading') return <div className="page-stack"><PageHeader title="Task details" description="Loading the selected server task." /><LoadingState label="Loading task…" /></div>
   if (!task && workspaceStatus === 'error') return <div className="page-stack"><PageHeader title="Task details unavailable" description="The server task list could not be loaded." /><ErrorState title="Could not load task" detail="Retry the task service, then reopen this task." action={<Button onClick={() => void refresh()}>Try again</Button>} /></div>
-  if (!task) return <div className="page-stack"><PageHeader title="Task not found" description="This task is not in your loaded server workspace." /><Button onClick={() => navigate('/tasks')}>Back to tasks</Button></div>
+  if (!task) return <div className="page-stack"><PageHeader title="Task not found" description="This task is not in your loaded server workspace." /><Button onClick={() => navigate(returnPath)}>Back to {returnLabel.toLowerCase()}</Button></div>
   const project = workspace.projects.find((item) => item.id === task.projectId)
   const availableAssignees = projectMembers.filter((member) => !assignees.some((assignee) => assignee.userId === member.userId))
   const availableDependencies = workspace.tasks.filter((candidate) => candidate.projectId === task.projectId && candidate.id !== task.id && !dependencies.some((dependency) => dependency.dependsOnTaskId === candidate.id))
-  return <div className="page-stack"><div className="back-link-row"><Button variant="ghost" size="sm" onClick={() => navigate('/tasks')}>← All tasks</Button></div>
-    <PageHeader eyebrow="TASK DETAILS" title={task.title} description={task.description || 'No description has been added.'} actions={<div className="page-actions"><Button variant="secondary" onClick={() => setEditing(true)}>Edit task</Button><Button variant="danger" onClick={() => { setDeleteError(''); setConfirmDelete(true) }}>Delete task</Button></div>} />
+  const priorityLabel = task.priority[0].toUpperCase() + task.priority.slice(1)
+  return <div className="page-stack task-detail-page">
+    <div className="back-link-row"><Button variant="ghost" size="sm" icon={<Icon name="arrow" className="icon-rotate" />} onClick={() => navigate(returnPath)}>Back to {returnLabel}</Button></div>
+    <header className="task-detail-hero"><div className="task-detail-hero__copy"><p className="page-header__eyebrow">TASK DETAIL{project ? ` · ${project.name}` : ''}</p><h1 title={task.title}>{task.title}</h1></div><div className="task-detail-hero__actions"><Button variant="secondary" onClick={() => setEditing(true)}>Edit task</Button><Button variant="danger" onClick={() => { setDeleteError(''); setConfirmDelete(true) }}>Delete task</Button></div></header>
     {deleteError && <p className="team-members-feedback team-members-feedback--error" role="alert">{deleteError}</p>}
-    <section className="content-panel detail-card"><div className="detail-summary"><div><span>Project</span><strong>{project?.name ?? 'Project unavailable'}</strong></div><div><span>Status</span><StatusBadge tone={taskTone(task.status)}>{taskStatusLabel(task.status)}</StatusBadge></div><div><span>Priority</span><StatusBadge tone={priorityTone(task.priority)}>{task.priority}</StatusBadge></div><div><span>Due date</span><strong>{formatDate(task.endDate)}</strong></div><div><span>Progress</span><strong>{task.progress}%</strong></div><div><span>Created by</span><strong>{task.createdByName}</strong></div></div>
-      <section className="task-dependencies" aria-labelledby="task-assignees-heading">
-        <h2 id="task-assignees-heading">Assignees</h2>
-        {detailLoading ? <p role="status">Loading task assignments…</p> : assignees.length ? <ul>{assignees.map((assignee) => <li key={assignee.id}><span>{assignee.userName} · {assignee.userEmail}</span><Button size="sm" variant="ghost" disabled={busy} onClick={() => void mutateTaskDetail(() => tasksApi.unassign(id, assignee.userId), reloadAssignments)}>Remove</Button></li>)}</ul> : <p>No one is assigned to this task.</p>}
-        <div className="task-detail-controls"><Select id="task-assignee" aria-label="Choose a project member to assign" value={selectedAssignee} onChange={(event) => setSelectedAssignee(event.target.value)} disabled={detailLoading || busy} options={[{ value: '', label: availableAssignees.length ? 'Choose a project member' : 'No available project members' }, ...availableAssignees.map((member) => ({ value: String(member.userId), label: `${member.userName} · ${member.roleName}` }))]} /><Button size="sm" variant="secondary" disabled={busy || detailLoading || !selectedAssignee} onClick={() => void mutateTaskDetail(() => tasksApi.assign(id, Number(selectedAssignee)), async () => { setSelectedAssignee(''); await reloadAssignments() })}>Assign</Button></div>
-      </section>
-      <section className="task-dependencies" aria-labelledby="task-dependencies-heading">
-        <h2 id="task-dependencies-heading">Depends on</h2>
-        {dependencies.length ? <ul>{dependencies.map((dependency) => <li key={dependency.id}><button type="button" className="table-link" onClick={() => navigate(`/tasks/${dependency.dependsOnTaskId}`)}>{dependency.dependsOnTaskTitle}</button><Button size="sm" variant="ghost" disabled={busy} onClick={() => void mutateTaskDetail(() => tasksApi.removeDependency(id, dependency.dependsOnTaskId), reloadDependencies)}>Remove</Button></li>)}</ul> : <p>This task has no prerequisite tasks.</p>}
-        <div className="task-detail-controls"><Select id="task-dependency" aria-label="Choose a prerequisite task" value={selectedDependency} onChange={(event) => setSelectedDependency(event.target.value)} disabled={detailLoading || busy} options={[{ value: '', label: availableDependencies.length ? 'Choose a prerequisite task' : 'No available tasks' }, ...availableDependencies.map((candidate) => ({ value: String(candidate.id), label: candidate.title }))]} /><Button size="sm" variant="secondary" disabled={busy || detailLoading || !selectedDependency} onClick={() => void mutateTaskDetail(() => tasksApi.addDependency(id, Number(selectedDependency)), async () => { setSelectedDependency(''); await reloadDependencies() })}>Add dependency</Button></div>
-        <h3>Tasks that depend on this task</h3>
-        {dependents.length ? <ul>{dependents.map((dependency) => <li key={dependency.id}><button type="button" className="table-link" onClick={() => navigate(`/tasks/${dependency.taskId}`)}>{dependency.taskTitle}</button></li>)}</ul> : <p>No tasks currently depend on this task.</p>}
-      </section>
+    <section className="task-overview content-panel" aria-labelledby="task-overview-heading">
+      <div className="task-overview__heading"><div><p className="page-header__eyebrow">AT A GLANCE</p><h2 id="task-overview-heading">Task information</h2></div><span className="task-overview__hint">Status, priority, and schedule</span></div>
+      <div className="task-detail-summary">
+        <div className="task-detail-fact"><span>Status</span><StatusBadge tone={taskTone(task.status)}>{taskStatusLabel(task.status)}</StatusBadge></div>
+        <div className="task-detail-fact"><span>Priority</span><StatusBadge tone={priorityTone(task.priority)}>{priorityLabel}</StatusBadge></div>
+        <div className="task-detail-fact"><span>Schedule</span><strong>{formatDateRange(task.startDate, task.endDate)}</strong></div>
+      </div>
+    </section>
+    <section className="task-description-panel content-panel" aria-labelledby="task-description-heading"><div className="task-description-panel__heading"><span className="task-description-panel__icon"><Icon name="list" /></span><div><p className="page-header__eyebrow">TASK BRIEF</p><h2 id="task-description-heading">Description</h2></div></div><div className="task-description-panel__body">{task.description?.trim() || 'No description has been added for this task yet.'}</div></section>
+    <section className="task-relations content-panel" aria-labelledby="task-relations-heading">
+      <div className="task-relations__heading"><div><p className="page-header__eyebrow">COLLABORATION</p><h2 id="task-relations-heading">People & dependencies</h2></div><span className="task-overview__hint">Manage ownership and task order</span></div>
+      <div className="task-relations__grid">
+        <section className="task-relation-card" aria-labelledby="task-assignees-heading">
+          <div className="task-relation-card__heading"><span className="task-relation-card__icon"><Icon name="users" /></span><div><h3 id="task-assignees-heading">Assignees</h3><span>{assignees.length} assigned</span></div></div>
+          {detailLoading ? <p className="task-relation-empty" role="status">Loading task assignments…</p> : assignees.length ? <ul className="task-relation-list">{assignees.map((assignee) => <li className="task-person-row" key={assignee.id}><span className="task-person-row__avatar">{assignee.userName.trim().charAt(0).toUpperCase() || '?'}</span><span className="task-person-row__copy"><strong>{assignee.userName}</strong><small>{assignee.userEmail}</small></span><Button size="sm" variant="ghost" disabled={busy} onClick={() => void mutateTaskDetail(() => tasksApi.unassign(id, assignee.userId), reloadAssignments)}>Remove</Button></li>)}</ul> : <p className="task-relation-empty">No one is assigned yet. Choose a project member below.</p>}
+          <div className="task-relation-controls"><Select id="task-assignee" aria-label="Choose a project member to assign" value={selectedAssignee} onChange={(event) => setSelectedAssignee(event.target.value)} disabled={detailLoading || busy} options={[{ value: '', label: availableAssignees.length ? 'Choose a project member' : 'No available project members' }, ...availableAssignees.map((member) => ({ value: String(member.userId), label: `${member.userName} · ${member.roleName}` }))]} /><Button size="sm" variant="secondary" disabled={busy || detailLoading || !selectedAssignee} onClick={() => void mutateTaskDetail(() => tasksApi.assign(id, Number(selectedAssignee)), async () => { setSelectedAssignee(''); await reloadAssignments() })}>Assign</Button></div>
+        </section>
+        <div className="task-relation-stack">
+          <section className="task-relation-card" aria-labelledby="task-dependencies-heading">
+            <div className="task-relation-card__heading"><span className="task-relation-card__icon"><Icon name="arrow" /></span><div><h3 id="task-dependencies-heading">Depends on</h3><span>{dependencies.length} prerequisite{dependencies.length === 1 ? '' : 's'}</span></div></div>
+            {dependencies.length ? <ul className="task-relation-list">{dependencies.map((dependency) => <li className="task-linked-row" key={dependency.id}><button type="button" className="table-link" onClick={() => navigate(taskDetailPath(dependency.dependsOnTaskId, `${window.location.pathname}${window.location.search}`))}>{dependency.dependsOnTaskTitle}</button><Button size="sm" variant="ghost" disabled={busy} onClick={() => void mutateTaskDetail(() => tasksApi.removeDependency(id, dependency.dependsOnTaskId), reloadDependencies)}>Remove</Button></li>)}</ul> : <p className="task-relation-empty">No prerequisite tasks have been added.</p>}
+            <div className="task-relation-controls"><Select id="task-dependency" aria-label="Choose a prerequisite task" value={selectedDependency} onChange={(event) => setSelectedDependency(event.target.value)} disabled={detailLoading || busy} options={[{ value: '', label: availableDependencies.length ? 'Choose a prerequisite task' : 'No available tasks' }, ...availableDependencies.map((candidate) => ({ value: String(candidate.id), label: candidate.title }))]} /><Button size="sm" variant="secondary" disabled={busy || detailLoading || !selectedDependency} onClick={() => void mutateTaskDetail(() => tasksApi.addDependency(id, Number(selectedDependency)), async () => { setSelectedDependency(''); await reloadDependencies() })}>Add dependency</Button></div>
+          </section>
+          <section className="task-relation-card" aria-labelledby="task-dependents-heading">
+            <div className="task-relation-card__heading"><span className="task-relation-card__icon task-relation-card__icon--muted"><Icon name="board" /></span><div><h3 id="task-dependents-heading">Blocks</h3><span>{dependents.length} dependent task{dependents.length === 1 ? '' : 's'}</span></div></div>
+            {dependents.length ? <ul className="task-relation-list">{dependents.map((dependency) => <li className="task-linked-row" key={dependency.id}><button type="button" className="table-link" onClick={() => navigate(taskDetailPath(dependency.taskId, `${window.location.pathname}${window.location.search}`))}>{dependency.taskTitle}</button></li>)}</ul> : <p className="task-relation-empty">No tasks depend on this one yet.</p>}
+          </section>
+        </div>
+      </div>
       {detailError && <p className="team-members-feedback team-members-feedback--error" role="alert">{detailError}</p>}
     </section>
     <TaskFormDialog open={editing} projectId={task.projectId} task={task} onClose={() => setEditing(false)} onSave={saveTaskChanges} />

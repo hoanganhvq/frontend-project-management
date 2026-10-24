@@ -4,6 +4,7 @@ import { authApi } from '../../api/services'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { Input } from '../ui/Input'
+import { navigate, parseRoute, taskDetailSourcePath } from '../../app/router'
 
 export function TopBar({ onMenu, menuExpanded, menuButtonRef, pageTitle, onNavigate }: { onMenu: () => void; menuExpanded: boolean; menuButtonRef: (node: HTMLButtonElement | null) => void; pageTitle: string; onNavigate: (page: string) => void }) {
   const [noticeOpen, setNoticeOpen] = useState(false)
@@ -11,6 +12,22 @@ export function TopBar({ onMenu, menuExpanded, menuButtonRef, pageTitle, onNavig
   const popoverRef = useRef<HTMLElement>(null)
   const { workspace, markNotificationRead, markAllNotificationsRead } = useDemoWorkspace()
   const unreadCount = workspace.notifications.filter((notification) => !notification.read).length
+  const route = parseRoute(`${window.location.pathname}${window.location.search}`)
+  const projectId = route.page === 'project-detail' ? route.id : route.page === 'task-detail' ? workspace.tasks.find((task) => task.id === route.id)?.projectId : undefined
+  const taskSourcePath = route.page === 'task-detail' ? taskDetailSourcePath(`${window.location.pathname}${window.location.search}`) : ''
+  const breadcrumbs = route.page === 'projects'
+    ? [{ label: 'Workspace', href: '/dashboard' }, { label: 'Project' }]
+    : route.page === 'project-detail'
+      ? [{ label: 'Workspace', href: '/dashboard' }, { label: 'Project', href: '/projects' }, { label: 'Project Detail' }]
+      : route.page === 'task-detail'
+        ? /^\/projects\/\d+$/.test(taskSourcePath)
+          ? [{ label: 'Workspace', href: '/dashboard' }, { label: 'Project', href: '/projects' }, { label: 'Project Detail', href: projectId ? `/projects/${projectId}` : taskSourcePath }, { label: 'Task Detail' }]
+          : taskSourcePath === '/timeline'
+            ? [{ label: 'Workspace', href: '/dashboard' }, { label: 'Timeline', href: '/timeline' }, { label: 'Task Detail' }]
+            : taskSourcePath === '/dashboard'
+              ? [{ label: 'Workspace', href: '/dashboard' }, { label: 'Dashboard' }, { label: 'Task Detail' }]
+              : [{ label: 'Workspace', href: '/dashboard' }, { label: 'Task', href: '/tasks' }, { label: 'Task Detail' }]
+        : [{ label: 'Workspace', href: '/dashboard' }, { label: pageTitle }]
   useEffect(() => {
     if (!noticeOpen) return
     popoverRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
@@ -32,7 +49,7 @@ export function TopBar({ onMenu, menuExpanded, menuButtonRef, pageTitle, onNavig
   }, [noticeOpen])
   return <header className="topbar">
     <button ref={menuButtonRef} className="topbar__menu icon-button" aria-label={menuExpanded ? 'Navigation open' : 'Open navigation'} aria-expanded={menuExpanded} aria-controls="main-sidebar" onClick={onMenu}><Icon name="menu" /></button>
-    <div className="breadcrumbs"><span>Workspace</span><Icon name="chevron" /><strong>{pageTitle}</strong></div>
+    <nav className="breadcrumbs" aria-label="Breadcrumb">{breadcrumbs.map((crumb, index) => <span className="breadcrumbs__item" key={`${crumb.label}-${index}`}>{index > 0 && <Icon name="chevron" />}{crumb.href ? <button type="button" onClick={() => navigate(crumb.href!)}>{crumb.label}</button> : <strong aria-current="page">{crumb.label}</strong>}</span>)}</nav>
     <div className="topbar__actions">
       <Input id="global-search" placeholder="Search anything…" leadingIcon={<Icon name="search" />} className="topbar__search-input" aria-label="Search anything" disabled />
       <div className="notification-menu">

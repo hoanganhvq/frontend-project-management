@@ -9,10 +9,10 @@ import { Input } from '../../components/ui/Input'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Select } from '../../components/ui/Select'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { formatDateRange, projectTone, toLocalDateInput } from '../../lib/format'
+import { formatDate, projectTone, toLocalDateInput } from '../../lib/format'
 import { projectStatusLabel, taskStatusLabel } from '../../types/domain'
 import type { Project, ProjectStatus } from '../../types/domain'
-import { navigate } from '../../app/router'
+import { navigate, taskDetailPath } from '../../app/router'
 import { ProjectFormDialog, type ProjectValues } from './ProjectFormDialog'
 import { TaskFormDialog, type TaskValues } from '../tasks/TaskFormDialog'
 import { priorityTone, taskTone } from '../../lib/format'
@@ -39,7 +39,8 @@ export function ProjectsPage({ openCreate = false }: { openCreate?: boolean }) {
 
   const columns: DataColumn<Project>[] = [
     { key: 'name', header: 'Project', render: (project) => <button type="button" className="table-link" onClick={() => navigate(`/projects/${project.id}`)}>{project.name}<small>{project.description || 'No description'}</small></button> },
-    { key: 'dates', header: 'Schedule', render: (project) => formatDateRange(project.startDate, project.endDate) },
+    { key: 'startDate', header: 'Start date', render: (project) => formatDate(project.startDate) },
+    { key: 'endDate', header: 'End date', render: (project) => formatDate(project.endDate) },
     { key: 'tasks', header: 'Tasks', render: (project) => workspace.tasks.filter((task) => task.projectId === project.id).length },
     { key: 'status', header: 'Status', render: (project) => <StatusBadge tone={projectTone(project.status)}>{projectStatusLabel(project.status)}</StatusBadge> },
     { key: 'open', header: '', render: (project) => <Button size="sm" variant="secondary" onClick={() => navigate(`/projects/${project.id}`)}>Open project</Button> },
@@ -107,9 +108,10 @@ export function ProjectDetailPage({ id }: { id: number }) {
   if (!project) return <section className="page-stack"><PageHeader title="Project not found" description="This project is not in your server workspace." /><EmptyState title="Project unavailable" detail="Return to projects and choose an accessible project." action={<Button onClick={() => navigate('/projects')}>Back to projects</Button>} /></section>
 
   const taskColumns: DataColumn<(typeof tasks)[number]>[] = [
-    { key: 'title', header: 'Task', render: (task) => <button type="button" className="table-link" onClick={() => navigate(`/tasks/${task.id}`)}>{task.title}<small>{task.description || 'No description'}</small></button> },
-    { key: 'dates', header: 'Due', render: (task) => formatDateRange(task.startDate, task.endDate) },
-    { key: 'priority', header: 'Priority', render: (task) => <StatusBadge tone={priorityTone(task.priority)}>{task.priority}</StatusBadge> },
+    { key: 'title', header: 'Task', render: (task) => <button type="button" className="table-link" onClick={() => navigate(taskDetailPath(task.id, `/projects/${id}`))}>{task.title}<small>{task.description || 'No description'}</small></button> },
+    { key: 'startDate', header: 'Start date', render: (task) => formatDate(task.startDate) },
+    { key: 'endDate', header: 'End date', render: (task) => formatDate(task.endDate) },
+    { key: 'priority', header: 'Priority', render: (task) => <StatusBadge tone={priorityTone(task.priority)}>{task.priority[0].toUpperCase() + task.priority.slice(1)}</StatusBadge> },
     { key: 'status', header: 'Status', render: (task) => <StatusBadge tone={taskTone(task.status)}>{taskStatusLabel(task.status)}</StatusBadge> },
   ]
 
@@ -135,15 +137,19 @@ export function ProjectDetailPage({ id }: { id: number }) {
   async function saveTask(values: TaskValues) {
     const taskId = await createTask(values)
     setTaskFormOpen(false)
-    navigate(`/tasks/${taskId}`)
+    navigate(taskDetailPath(taskId, `/projects/${id}`))
   }
 
-  return <div className="page-stack">
+  return <div className="page-stack project-detail-page">
     <div className="back-link-row"><Button variant="ghost" size="sm" icon={<Icon name="arrow" className="icon-rotate" />} onClick={() => navigate('/projects')}>All projects</Button></div>
-    <PageHeader eyebrow="PROJECT DETAILS" title={project.name} description={project.description || 'No project description has been added.'} actions={<div className="page-actions"><Button variant="secondary" onClick={() => navigate(`/team-members?projectName=${encodeURIComponent(project.name)}`)}>Members</Button>{project.ownerId === user.id && <><Button variant="secondary" onClick={() => setFormOpen(true)}>Edit project</Button><Button variant="danger" onClick={() => { setDeleteError(''); setConfirmDelete(true) }}>Delete</Button></>}<Button variant="secondary" onClick={() => setTaskFormOpen(true)} icon={<Icon name="plus" />}>Add task</Button></div>} />
+    <header className="project-detail-hero">
+      <div className="project-detail-hero__copy"><p className="page-header__eyebrow">PROJECT DETAIL</p><h1>{project.name}</h1><p>{project.description || 'No project description has been added.'}</p></div>
+      {project.ownerId === user.id && <div className="project-detail-actions"><Button variant="secondary" onClick={() => setFormOpen(true)}>Edit project</Button><Button variant="danger" onClick={() => { setDeleteError(''); setConfirmDelete(true) }}>Delete project</Button></div>}
+    </header>
     <div className="detail-summary">
       <div><span>Project status</span><StatusBadge tone={projectTone(project.status)}>{projectStatusLabel(project.status)}</StatusBadge></div>
-      <div><span>Schedule</span><strong>{formatDateRange(project.startDate, project.endDate)}</strong></div>
+      <div><span>Start date</span><strong>{formatDate(project.startDate)}</strong></div>
+      <div><span>End date</span><strong>{formatDate(project.endDate)}</strong></div>
       <div><span>Project tasks</span><strong>{tasks.length}</strong></div>
     </div>
     <section className="content-panel" aria-labelledby="project-tasks-heading">

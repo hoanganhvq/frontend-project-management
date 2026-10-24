@@ -68,6 +68,26 @@ export function navigate(path: string, options: { replace?: boolean } = {}) {
   window.scrollTo({ top: 0, behavior: 'auto' })
 }
 
+export function taskDetailPath(taskId: number, from: string): string {
+  return `/tasks/${taskId}?from=${encodeURIComponent(from)}`
+}
+
+export function taskDetailReturnPath(path: string): string {
+  const from = new URLSearchParams(path.split('?')[1] ?? '').get('from')
+  if (from && (/^\/projects\/\d+$/.test(from) || /^\/tasks(?:\/\d+)?(?:\?.+)?$/.test(from) || from === '/timeline' || from === '/dashboard')) return from
+  return '/tasks'
+}
+
+export function taskDetailSourcePath(path: string): string {
+  let sourcePath = taskDetailReturnPath(path)
+  let depth = 0
+  while (/^\/tasks\/\d+(?:\?.*)?$/.test(sourcePath) && depth < 12) {
+    sourcePath = taskDetailReturnPath(sourcePath)
+    depth += 1
+  }
+  return sourcePath
+}
+
 export function useAppRoute(): AppRoute {
   const path = useSyncExternalStore(subscribe, currentPath, () => '/')
   return parseRoute(path)

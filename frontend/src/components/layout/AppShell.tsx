@@ -61,7 +61,7 @@ export function AppShell({ activePage, pageTitle, onNavigate, children }: { acti
     />
     <div className="app-shell__main">
       <TopBar menuButtonRef={(node) => { menuButtonRef.current = node }} menuExpanded={mobileOpen} onMenu={() => setMobileOpen(true)} pageTitle={pageTitle} onNavigate={onNavigate} />
-      <div className="demo-mode-banner" role="status"><span className="demo-mode-banner__dot" /><span><strong>Connected to project API</strong> · Projects, tasks, groups, and project membership use the server. AI schedule generation sends PDFs to the n8n test webhook; milestones, notifications, and preferences are preview-only.</span></div>
+      {activePage !== 'Dashboard' && activePage !== 'Projects' && activePage !== 'Team members' && pageTitle !== 'Task details' && <div className="demo-mode-banner" role="status"><span className="demo-mode-banner__dot" /><span><strong>Connected to project API</strong> · Projects, tasks, groups, and project membership use the server. AI schedule generation sends PDFs to the n8n test webhook; milestones, notifications, and preferences are preview-only.</span></div>}
       {persistenceNotice && <div className="storage-warning" role="alert">{persistenceNotice} <button type="button" onClick={() => void refresh()}>Retry</button></div>}
       <main id="main-content" className="main-content">{children}</main>
       <ChatWidget />

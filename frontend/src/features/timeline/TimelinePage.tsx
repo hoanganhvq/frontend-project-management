@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import { tasksApi } from '../../api/services'
 import type { TaskAssignee } from '../../api/models'
 import { useDemoWorkspace } from '../../app/DemoWorkspaceProvider'
-import { navigate } from '../../app/router'
+import { navigate, taskDetailPath } from '../../app/router'
 import { Button } from '../../components/ui/Button'
 import { EmptyState, LoadingState } from '../../components/ui/States'
 import { Icon } from '../../components/ui/Icon'
@@ -72,7 +72,7 @@ export function TimelinePage() {
   const rangeDays = zoom === 'day' ? 14 : zoom === 'week' ? 56 : 180
   const lookbackDays = zoom === 'day' ? 7 : zoom === 'week' ? 14 : 30
   const anchorDate = offsetDate(today, -lookbackDays + offset * rangeDays)
-  const selectTimelineTask = useCallback((taskId: number) => navigate(`/tasks/${taskId}`), [])
+  const selectTimelineTask = useCallback((taskId: number) => navigate(taskDetailPath(taskId, '/timeline')), [])
 
   const saveTimelineTask = useCallback(async (taskId: number, changes: Parameters<typeof updateTask>[1]) => {
     setTimelineError('')
