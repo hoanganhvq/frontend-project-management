@@ -204,12 +204,6 @@ export function TeamMembersPage() {
   return <div className="page-stack team-members-page">
     <PageHeader eyebrow="PROJECT DIRECTORY" title="Team Members" description="Manage people and project roles from the project membership records." actions={<Button variant="primary" disabled={!selectedProject?.canManageMembers || busy} title={!selectedProject?.canManageMembers ? 'Only the project owner or a project leader can add members.' : undefined} onClick={() => { setAddOpen(true); setOperationError('') }}><Icon name="plus" /> Add member</Button>} />
 
-    <aside className="team-members-notice" role="note">
-      <span className="team-members-notice__icon"><Icon name="users" /></span>
-      <div><strong>Project members · live API data</strong><p>The owner is read from the project record; other people come from project membership records. User accounts, group membership, and task assignees remain separate. Roster and group changes are sent to the backend.</p></div>
-      <StatusBadge tone="green">Server data</StatusBadge>
-    </aside>
-
     {loadingProjects ? <LoadingState label="Loading your projects…" />
       : pageError && projects.length === 0 ? <ErrorState title="Could not load your projects" detail={pageError} action={<Button onClick={() => void loadProjects()}>Try again</Button>} />
         : projects.length === 0 ? <EmptyState title="No projects available" detail="You are not currently listed as the owner or a member of any project. Project access is required before a roster can be shown." />
@@ -217,7 +211,7 @@ export function TeamMembersPage() {
             <section className="team-members-panel content-panel" aria-label="Project member directory">
               <div className="team-members-toolbar">
                 <div className="team-members-project-picker"><label htmlFor="team-project">Project</label><Select id="team-project" aria-label="Select project" value={String(projectId)} disabled={busy} onChange={(event) => { setProjectId(event.target.value ? Number(event.target.value) : ''); setProjectSelectionNotice(''); setNewRole('MEMBER') }} options={[{ value: '', label: 'Choose a project' }, ...projects.map((project) => ({ value: String(project.id), label: project.name }))]} /></div>
-                <div className="team-members-count"><strong>{selectedProject ? members.length : 0}</strong><span>{members.length === 1 ? 'person' : 'people'} in this project</span></div>
+                <div className="team-members-count"><span className="team-members-count__label">People in this project</span><strong>{selectedProject ? members.length : 0}<small>{members.length === 1 ? ' member' : ' members'}</small></strong></div>
               </div>
 
               <div className="team-members-filters">
@@ -234,20 +228,20 @@ export function TeamMembersPage() {
                   : projectId === '' ? <EmptyState title="Choose a server project" detail="Select a project to view its live member roster." />
                     : members.length === 0 ? <EmptyState title="No member records yet" detail="This project has no member records yet." action={selectedProject?.canManageMembers ? <Button variant="primary" onClick={() => setAddOpen(true)}><Icon name="plus" /> Add the first member</Button> : undefined} />
                     : filteredMembers.length === 0 ? <EmptyState title="No matching members" detail="Try a different name, email, or project role filter." />
-                      : <div className="team-member-list">{filteredMembers.map((member) => {
+                      : <div className="team-member-table-wrap"><table className="data-table team-member-table"><thead><tr><th scope="col">Member</th><th scope="col">Position</th><th scope="col">Project role</th><th scope="col">Joined</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{filteredMembers.map((member) => {
                         const editable = selectedProject?.canManageMembers && !member.projectOwner && member.id !== null
                         const chosenRole = member.id === null ? 'MEMBER' : roleDrafts[member.id] ?? (member.roleName === 'LEADER' ? 'LEADER' : 'MEMBER')
-                        return <article className="team-member-row" key={member.id ?? `owner-${member.userId}`}>
-                          <span className="team-member-avatar" aria-hidden="true">{member.photo ? <img src={member.photo} alt="" /> : initials(member.userName)}</span>
-                          <div className="team-member-identity"><h2>{member.userName}</h2><p>{member.email}{member.position ? ` · ${member.position}` : ''}</p></div>
-                          <div className="team-member-role"><StatusBadge tone={member.roleName === 'OWNER' ? 'purple' : member.roleName === 'LEADER' ? 'blue' : 'gray'}>{member.roleName === 'OWNER' ? 'Owner' : member.roleName === 'LEADER' ? 'Leader' : 'Member'}</StatusBadge></div>
-                          <div className="team-member-joined"><span>Joined</span><strong>{formatJoinedAt(member.joinedAt)}</strong></div>
-                          <div className="team-member-actions">
+                        return <tr key={member.id ?? `owner-${member.userId}`}>
+                          <td><div className="team-member-identity"><span className="team-member-avatar" aria-hidden="true">{member.photo ? <img src={member.photo} alt="" /> : initials(member.userName)}</span><span className="team-member-identity__copy"><strong>{member.userName}</strong><small>{member.email}</small></span></div></td>
+                          <td><span className="team-member-position">{member.position || '—'}</span></td>
+                          <td><StatusBadge tone={member.roleName === 'OWNER' ? 'purple' : member.roleName === 'LEADER' ? 'blue' : 'gray'}>{member.roleName === 'OWNER' ? 'Owner' : member.roleName === 'LEADER' ? 'Leader' : 'Member'}</StatusBadge></td>
+                          <td><span className="team-member-joined">{formatJoinedAt(member.joinedAt)}</span></td>
+                          <td><div className="team-member-actions">
                             {editable && <><Select aria-label={`Set project role for ${member.userName}`} value={chosenRole} disabled={busy} onChange={(event) => setRoleDrafts((current) => ({ ...current, [member.id as number]: event.target.value as ProjectRole }))} options={[{ value: 'MEMBER', label: 'Member' }, ...(selectedProject?.canAssignLeader || chosenRole === 'LEADER' ? [{ value: 'LEADER', label: 'Leader' }] : [])]} /><Button size="sm" variant="secondary" disabled={busy || chosenRole === member.roleName} onClick={() => void handleRoleChange(member)}>Save role</Button><Button size="sm" variant="danger" disabled={busy} onClick={() => { setRemoveMember(member); setOperationError('') }}>Remove</Button></>}
                             <Button size="sm" variant="ghost" onClick={() => setDetailMember(member)}>View details</Button>
-                          </div>
-                        </article>
-                      })}</div>}
+                          </div></td>
+                        </tr>
+                      })}</tbody></table></div>}
             </section>
             {selectedProject && <ProjectGroupsPanel projectId={selectedProject.id} projectName={selectedProject.name} projectMembers={members} canManage={selectedProject.canManageMembers} onGroupData={acceptGroupData} />}
             <p className="team-members-permission-note">{selectedProject?.canManageMembers ? 'You can manage this project roster. The server checks your owner or LEADER permission on every change.' : 'You can view this roster. Only the project owner or a LEADER can change membership.'}</p>
@@ -263,8 +257,8 @@ export function TeamMembersPage() {
       </form>
     </Dialog>
 
-    <Dialog open={detailMember !== null} title={detailMember?.userName ?? 'Member details'} description="Project membership record" onClose={() => setDetailMember(null)}>
-      {detailMember && <div className="team-member-detail"><div className="team-member-detail__identity"><span className="team-member-avatar team-member-avatar--large" aria-hidden="true">{detailMember.photo ? <img src={detailMember.photo} alt="" /> : initials(detailMember.userName)}</span><div><strong>{detailMember.userName}</strong><span>{detailMember.email}</span></div></div><dl className="team-member-details"><div><dt>Project role</dt><dd>{detailMember.roleName === 'OWNER' ? 'Owner' : detailMember.roleName === 'LEADER' ? 'Leader' : 'Member'}</dd></div><div><dt>Position</dt><dd>{detailMember.position || 'Not provided'}</dd></div><div><dt>Joined project</dt><dd>{formatJoinedAt(detailMember.joinedAt)}</dd></div></dl></div>}
+    <Dialog open={detailMember !== null} title={detailMember?.userName ?? 'Member details'} description="Project membership and skills" onClose={() => setDetailMember(null)}>
+      {detailMember && <div className="team-member-detail"><div className="team-member-detail__identity"><span className="team-member-avatar team-member-avatar--large" aria-hidden="true">{detailMember.photo ? <img src={detailMember.photo} alt="" /> : initials(detailMember.userName)}</span><div><strong>{detailMember.userName}</strong><span>{detailMember.email}</span><span>{detailMember.position || 'Position not provided'}</span></div><StatusBadge tone={detailMember.roleName === 'OWNER' ? 'purple' : detailMember.roleName === 'LEADER' ? 'blue' : 'gray'}>{detailMember.roleName === 'OWNER' ? 'Owner' : detailMember.roleName === 'LEADER' ? 'Leader' : 'Member'}</StatusBadge></div><dl className="team-member-details"><div><dt>Project</dt><dd>{detailMember.projectName}</dd></div><div><dt>Joined project</dt><dd>{formatJoinedAt(detailMember.joinedAt)}</dd></div></dl><section className="team-member-skills" aria-labelledby="member-skills-title"><div className="team-member-skills__heading"><div><span>PROFILE</span><h3 id="member-skills-title">Member skills</h3></div><span>{(detailMember.skills ?? []).length} {(detailMember.skills ?? []).length === 1 ? 'skill' : 'skills'}</span></div>{(detailMember.skills ?? []).length ? <ul>{detailMember.skills.map((skill) => { const level = skill.level || 'Unspecified'; return <li key={skill.skillId}><span className="team-member-skill__mark"><Icon name="check" /></span><span className="team-member-skill__copy"><strong>{skill.name}</strong><small>{skill.category || 'General skill'}</small></span><span className={`team-member-skill__level team-member-skill__level--${level.toLowerCase()}`}>{level}</span></li> })}</ul> : <p className="team-member-skills__empty">No skills have been added to this member’s profile yet.</p>}</section></div>}
     </Dialog>
 
     <Dialog open={removeMember !== null} title="Remove project member?" description={`This removes ${removeMember?.userName ?? 'this person'} from ${selectedProject?.name ?? 'the project'}. Their user account will not be deleted.`} onClose={() => { if (!busy) setRemoveMember(null) }} actions={<><Button variant="secondary" disabled={busy} onClick={() => setRemoveMember(null)}>Cancel</Button><Button variant="danger" disabled={busy} onClick={() => void confirmRemoveMember()}>{busy ? 'Removing…' : 'Remove member'}</Button></>}>

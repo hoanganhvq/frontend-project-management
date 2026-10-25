@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { Gantt, type Link as GanttLink, type Task as GanttTask } from 'dhtmlx-gantt'
+import { Gantt, type Task as GanttTask } from 'dhtmlx-gantt'
 import 'dhtmlx-gantt/codebase/dhtmlxgantt.css'
+import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/States'
+import { getSettingsPreferences } from '../../app/settingsPreferences'
 import { formatLocalDateOnly, fromGanttEndDate, mapTasksToGantt, parseLocalDateOnly } from './ganttMapping'
 import type { ProjectMilestone, Task } from '../../types/domain'
 import './DhtmlxGanttTimeline.css'
@@ -15,8 +17,19 @@ type Props = {
   zoom: TimelineZoom
   anchorDate: Date
   focusToday: boolean
+  editable: boolean
+  canEditSchedule: boolean
+  permissionLoading: boolean
+  permissionError: string
+  savingChanges: boolean
+  canUndo: boolean
+  hasPendingChanges: boolean
+  onEdit: () => void
+  onUndo: () => void
+  onCancel: () => void
+  onSave: () => void
   onTaskSelect: (taskId: number) => void
-  onUpdateTask: (taskId: number, changes: Omit<Partial<Task>, 'id' | 'projectId'>) => void | Promise<void>
+  onUpdateTask: (taskId: number, changes: { startDate?: string; endDate?: string }) => void
 }
 
 function addCalendarDays(value: Date, days: number): Date {
@@ -31,16 +44,22 @@ function taskColor(task: Task): string {
   return 'timeline-gantt-task--todo'
 }
 
-export function DhtmlxGanttTimeline({ projectName, tasks, milestones, zoom, anchorDate, focusToday, onTaskSelect, onUpdateTask }: Props) {
+export function DhtmlxGanttTimeline({ projectName, tasks, milestones, zoom, anchorDate, focusToday, editable, canEditSchedule, permissionLoading, permissionError, savingChanges, canUndo, hasPendingChanges, onEdit, onUndo, onCancel, onSave, onTaskSelect, onUpdateTask }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const ganttRef = useRef<ReturnType<typeof Gantt.getGanttInstance> | null>(null)
   const taskIdsByGanttIdRef = useRef(new Map<string | number, number>())
+  const editableRef = useRef(editable)
+  const onTaskSelectRef = useRef(onTaskSelect)
+  const onUpdateTaskRef = useRef(onUpdateTask)
+  const lastViewRef = useRef<{ projectName: string; zoom: TimelineZoom; anchor: number; focusToday: boolean } | null>(null)
   const mapped = useMemo(() => mapTasksToGantt(tasks, milestones), [tasks, milestones])
   const taskLookup = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks])
   const previewDays = zoom === 'day' ? 14 : zoom === 'week' ? 56 : 180
   const previewEnd = useMemo(() => addCalendarDays(anchorDate, previewDays), [anchorDate, previewDays])
 
   taskIdsByGanttIdRef.current = new Map(tasks.filter((task) => mapped.tasks.some((ganttTask) => ganttTask.id === task.id)).map((task) => [task.id, task.id]))
+
+  useEffect(() => { editableRef.current = editable; onTaskSelectRef.current = onTaskSelect; onUpdateTaskRef.current = onUpdateTask }, [editable, onTaskSelect, onUpdateTask])
 
   useEffect(() => {
     const host = hostRef.current
@@ -53,10 +72,12 @@ export function DhtmlxGanttTimeline({ projectName, tasks, milestones, zoom, anch
     gantt.config.date_format = '%Y-%m-%d'
     gantt.config.duration_unit = 'day'
     gantt.config.duration_step = 1
-    gantt.config.drag_move = true
-    gantt.config.drag_resize = true
+    gantt.config.start_on_monday = getSettingsPreferences().weekStartsOn === 'monday'
+    gantt.config.readonly = true
+    gantt.config.drag_move = false
+    gantt.config.drag_resize = false
     gantt.config.drag_progress = false
-    gantt.config.drag_links = true
+    gantt.config.drag_links = false
     gantt.config.details_on_create = false
     gantt.config.details_on_dblclick = false
     gantt.config.show_errors = false
@@ -87,10 +108,11 @@ export function DhtmlxGanttTimeline({ projectName, tasks, milestones, zoom, anch
     const eventIds: string[] = []
     eventIds.push(gantt.attachEvent('onTaskClick', (id) => {
       const taskId = taskIdsByGanttIdRef.current.get(id)
-      if (taskId !== undefined) onTaskSelect(taskId)
+      if (!editableRef.current && taskId !== undefined) onTaskSelectRef.current(taskId)
       return true
     }))
     eventIds.push(gantt.attachEvent('onAfterTaskDrag', (id, mode) => {
+      if (!editableRef.current) return
       if (mode !== 'move' && mode !== 'resize') return
       const taskId = taskIdsByGanttIdRef.current.get(id)
       if (taskId === undefined) return
@@ -98,25 +120,8 @@ export function DhtmlxGanttTimeline({ projectName, tasks, milestones, zoom, anch
       if (!task.start_date || !task.end_date) return
       const startDate = formatLocalDateOnly(task.start_date)
       const endDate = fromGanttEndDate(task.end_date)
-      if (parseLocalDateOnly(startDate) && parseLocalDateOnly(endDate)) void Promise.resolve(onUpdateTask(taskId, { startDate, endDate })).catch(() => undefined)
+      if (parseLocalDateOnly(startDate) && parseLocalDateOnly(endDate)) onUpdateTaskRef.current(taskId, { startDate, endDate })
     }))
-
-    const syncDependencyTarget = (target: string | number) => {
-      const taskId = taskIdsByGanttIdRef.current.get(target)
-      if (taskId === undefined || typeof target !== 'number') return
-      const dependencyIds = gantt.getLinks()
-        .filter((link) => link.target === target && typeof link.source === 'number' && taskIdsByGanttIdRef.current.has(link.source))
-        .map((link) => link.source as number)
-      void Promise.resolve(onUpdateTask(taskId, { dependencyIds })).catch(() => undefined)
-    }
-    eventIds.push(gantt.attachEvent('onLinkValidation', (link: GanttLink) => {
-      return link.source !== link.target
-        && taskIdsByGanttIdRef.current.has(link.source)
-        && taskIdsByGanttIdRef.current.has(link.target)
-    }))
-    eventIds.push(gantt.attachEvent('onAfterLinkAdd', (_id, link) => syncDependencyTarget(link.target)))
-    eventIds.push(gantt.attachEvent('onAfterLinkDelete', (_id, link) => syncDependencyTarget(link.target)))
-    eventIds.push(gantt.attachEvent('onAfterLinkUpdate', (_id, link) => syncDependencyTarget(link.target)))
 
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width ?? 900
@@ -131,7 +136,17 @@ export function DhtmlxGanttTimeline({ projectName, tasks, milestones, zoom, anch
       gantt.destructor()
       ganttRef.current = null
     }
-  }, [onTaskSelect, onUpdateTask])
+  }, [])
+
+  useEffect(() => {
+    const gantt = ganttRef.current
+    if (!gantt) return
+    gantt.config.readonly = !editable
+    gantt.config.drag_move = editable
+    gantt.config.drag_resize = editable
+    gantt.config.drag_links = false
+    gantt.render()
+  }, [editable])
 
   useEffect(() => {
     const gantt = ganttRef.current
@@ -140,25 +155,48 @@ export function DhtmlxGanttTimeline({ projectName, tasks, milestones, zoom, anch
       const source = typeof task.id === 'number' ? taskLookup.get(task.id) : undefined
       return source ? { ...task, cssClass: taskColor(source) } : task
     })
+    const previousScroll = gantt.getScrollState()
     gantt.clearAll()
     gantt.parse({ data: ganttTasks, links: mapped.links })
     gantt.ext.zoom.setLevel(zoom)
     gantt.config.start_date = anchorDate
     gantt.config.end_date = previewEnd
     gantt.render()
-    gantt.showDate(focusToday ? new Date() : anchorDate)
-  }, [mapped, zoom, anchorDate, previewEnd, taskLookup, focusToday])
+    const previousView = lastViewRef.current
+    const preserveViewport = previousView?.projectName === projectName
+      && previousView.zoom === zoom
+      && previousView.anchor === anchorDate.getTime()
+      && previousView.focusToday === focusToday
+    if (preserveViewport) {
+      gantt.scrollTo(previousScroll.x, previousScroll.y)
+    } else {
+      gantt.showDate(focusToday ? new Date() : anchorDate)
+    }
+    lastViewRef.current = { projectName, zoom, anchor: anchorDate.getTime(), focusToday }
+  }, [mapped, projectName, zoom, anchorDate, previewEnd, taskLookup, focusToday])
 
   const scheduledCount = mapped.tasks.filter((task) => typeof task.id === 'number').length
 
   return <section className="content-panel gantt-panel timeline-gantt-panel" aria-label="Project Gantt schedule">
     <div className="gantt-panel__heading">
       <div><h2>{projectName}</h2><p>{scheduledCount} scheduled tasks · {mapped.links.length} server dependencies</p></div>
+      <div className="timeline-edit-actions">
+        {permissionLoading ? <span className="timeline-permission-note">Checking edit permission…</span>
+          : canEditSchedule && !permissionError
+            ? editable ? <>
+              <Button variant="ghost" size="sm" disabled={!canUndo || savingChanges} onClick={onUndo}>Undo</Button>
+              <Button variant="secondary" size="sm" disabled={savingChanges} onClick={onCancel}>Cancel</Button>
+              <Button variant="primary" size="sm" disabled={!hasPendingChanges || savingChanges} onClick={onSave}>{savingChanges ? 'Saving…' : 'Save changes'}</Button>
+              {hasPendingChanges && <span className="timeline-unsaved-badge">Unsaved</span>}
+            </> : <Button variant="primary" size="sm" onClick={onEdit}>Edit timeline</Button>
+            : <span className="timeline-permission-note">{permissionError ? 'Edit permission unavailable' : 'View only · owner or leader can edit'}</span>}
+      </div>
     </div>
+    {permissionError && <p className="timeline-permission-error" role="status">{permissionError}</p>}
     {tasks.length === 0 ? <EmptyState title="No tasks in this project" detail="Add demo tasks to see them on the timeline." /> : <>
       <div ref={hostRef} className="timeline-gantt-host" role="region" aria-label="Interactive, horizontally scrollable project Gantt chart" tabIndex={0} />
       {mapped.unscheduledTaskIds.length > 0 && <p className="timeline-gantt-note" role="status">{mapped.unscheduledTaskIds.length} task{mapped.unscheduledTaskIds.length === 1 ? '' : 's'} omitted because a valid start and end date are not available. No dates were assigned.</p>}
-      <p className="timeline-gantt-note">Drag or resize a task bar to save its dates. Add or remove dependency links to update the server schedule. Select a task row or bar to open its details.</p>
+      <p className="timeline-gantt-note">{editable ? 'Move a task bar or drag either edge to change its dates. Changes stay as a draft until you save.' : 'Timeline is read only. Select a task row or bar to open its details.'} Dependencies are shown on the chart.</p>
     </>}
   </section>
 }

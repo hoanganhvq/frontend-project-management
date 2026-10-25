@@ -1,4 +1,8 @@
 .timeline-gantt-panel { min-width: 0; }
+.timeline-edit-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-2); }
+.timeline-permission-note { color: var(--color-muted); font-size: var(--font-size-xs); }
+.timeline-permission-error { margin: 0; padding: var(--space-2) var(--space-5); color: var(--color-amber); font-size: var(--font-size-xs); }
+.timeline-unsaved-badge { padding: 4px 8px; border: 1px solid var(--color-amber-line); border-radius: var(--radius-pill); background: var(--color-amber-soft); color: var(--color-amber); font-size: 10px; font-weight: 750; }
 .timeline-gantt-host {
   width: 100%;
   height: min(66vh, 46rem);
@@ -78,8 +82,10 @@
   font-size: var(--font-size-xs);
 }
 @media (max-width: 40rem) {
+  .timeline-edit-actions { justify-content: flex-start; }
   .timeline-gantt-host { height: 60vh; min-height: 20rem; }
   .timeline-gantt-note { padding: var(--space-3); }
+  .timeline-permission-error { padding-right: var(--space-3); padding-left: var(--space-3); }
 }
 @media (prefers-reduced-motion: reduce) {
   .timeline-gantt-host *,

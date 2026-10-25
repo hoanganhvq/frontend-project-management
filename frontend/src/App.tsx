@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './app/AuthProvider'
 import { DemoWorkspaceProvider } from './app/DemoWorkspaceProvider'
-import { useAppRoute, navigate } from './app/router'
+import { useAppRoute, navigate, taskDetailSourcePath } from './app/router'
 import { AppShell } from './components/layout/AppShell'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { ProjectsPage, ProjectDetailPage } from './features/projects/ProjectsPage'
@@ -13,6 +13,8 @@ import { SettingsPage } from './features/profile/SettingsPage'
 import { TimelinePage } from './features/timeline/TimelinePage'
 import { TeamMembersPage } from './features/team/TeamMembersPage'
 import { AuthLoadingPage, AuthUnavailablePage, LoginPage, RegisterPage } from './features/auth/LoginPage'
+import { applySettingsPreferences, getDefaultLandingPath, getSettingsPreferences } from './app/settingsPreferences'
+import { LocalizedApp } from './app/LocalizedApp'
 
 const pageMeta = {
   login: ['Sign in', 'Sign in'],
@@ -34,7 +36,29 @@ const pageMeta = {
 function RoutedApp() {
   const route = useAppRoute()
   const { user, status, error: authError, refresh } = useAuth()
-  const [activePage, pageTitle] = pageMeta[route.page]
+  const [defaultActivePage, pageTitle] = pageMeta[route.page]
+
+  useEffect(() => {
+    applySettingsPreferences()
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const updateSystemTheme = () => {
+      if (getSettingsPreferences().theme === 'system') applySettingsPreferences()
+    }
+    media.addEventListener('change', updateSystemTheme)
+    return () => media.removeEventListener('change', updateSystemTheme)
+  }, [])
+  const taskSourcePath = route.page === 'task-detail'
+    ? taskDetailSourcePath(`${window.location.pathname}${window.location.search}`)
+    : ''
+  const activePage = route.page === 'task-detail'
+    ? /^\/projects\/\d+$/.test(taskSourcePath)
+      ? 'Projects'
+      : taskSourcePath === '/timeline'
+        ? 'Timeline'
+        : taskSourcePath === '/dashboard'
+          ? 'Dashboard'
+          : 'Task board'
+    : defaultActivePage
 
   useEffect(() => {
     if (status !== 'ready') return
@@ -45,7 +69,7 @@ function RoutedApp() {
     }
     if (user && (route.page === 'login' || route.page === 'register')) {
       const requested = new URLSearchParams(window.location.search).get('redirect')
-      const target = requested?.startsWith('/') && !requested.startsWith('//') ? requested : '/dashboard'
+      const target = requested?.startsWith('/') && !requested.startsWith('//') ? requested : getDefaultLandingPath()
       navigate(target, { replace: true })
     }
   }, [status, user, route.page])
@@ -75,7 +99,7 @@ function RoutedApp() {
 }
 
 export default function App() {
-  return <AuthProvider><AuthenticatedApp /></AuthProvider>
+  return <LocalizedApp><AuthProvider><AuthenticatedApp /></AuthProvider></LocalizedApp>
 }
 
 function AuthenticatedApp() {

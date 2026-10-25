@@ -1,9 +1,10 @@
 import { ApiError, apiRequest } from './client'
-import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary, ApproveScheduleRequest, ApproveScheduleResponse, GenerateAiScheduleResponse, GroupMember, LoginRequest, N8nScheduleChatRequest, N8nScheduleChatResponse, ProjectGroup, ProjectGroupRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskAssignee, TaskDependency, TaskRequest, TaskResponse, TaskUpdateRequest, UpdatePendingScheduleRequest, UserResponse, UserUpdateRequest } from './models'
+import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary, ApproveScheduleRequest, ApproveScheduleResponse, GenerateAiScheduleResponse, GroupMember, LoginRequest, N8nScheduleChatRequest, N8nScheduleChatResponse, ProjectGroup, ProjectGroupRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskAssignee, TaskDependency, TaskRequest, TaskResponse, TaskScheduleBatchUpdateRequest, TaskUpdateRequest, UpdatePendingScheduleRequest, UserResponse, UserUpdateRequest } from './models'
 
 export const authApi = {
   login: (body: LoginRequest) => apiRequest<string>('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   register: (body: RegisterRequest) => apiRequest<string>('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+  requestPasswordReset: (email: string) => apiRequest<unknown>('/api/auth/forgotPassword', { method: 'POST', body: JSON.stringify({ email }) }),
   me: <T>() => apiRequest<T>('/api/auth/me'),
   logout: () => apiRequest<unknown>('/api/auth/logout'),
 }
@@ -51,6 +52,7 @@ export const usersApi = {
 export const tasksApi = {
   create: (body: TaskRequest) => apiRequest<TaskResponse>('/api/tasks', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: number, body: TaskUpdateRequest) => apiRequest<TaskResponse>(`/api/tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  updateSchedules: (body: TaskScheduleBatchUpdateRequest) => apiRequest<TaskResponse[]>('/api/tasks/schedule', { method: 'PUT', body: JSON.stringify(body) }),
   getById: (id: number) => apiRequest<TaskResponse>(`/api/tasks/${id}`),
   getByProject: (projectId: number) => apiRequest<TaskResponse[]>(`/api/tasks/project/${projectId}`),
   delete: (id: number) => apiRequest<string>(`/api/tasks/${id}`, { method: 'DELETE' }),
