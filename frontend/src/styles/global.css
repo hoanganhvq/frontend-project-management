@@ -614,12 +614,3 @@ kbd { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-line
   .focus-item { grid-template-columns: 2rem minmax(0, 1fr); }
   .focus-item__date { grid-column: 2 !important; }
 }
-/* Server-backed sign-in screen */
-.auth-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: var(--color-canvas, #f4f6f8); }
-.auth-card { width: min(100%, 440px); display: grid; gap: 18px; padding: 36px; border: 1px solid var(--color-border, #e2e6ea); border-radius: 18px; background: white; box-shadow: 0 20px 60px rgb(20 35 50 / 9%); }
-.auth-card h1, .auth-card p { margin: 0; }
-.auth-card > p:not(.auth-eyebrow) { color: var(--color-text-muted, #65717d); }
-.auth-eyebrow { color: var(--color-primary, #315bd6); font-size: 12px; font-weight: 700; letter-spacing: .12em; }
-.auth-form { display: grid; gap: 16px; }
-.auth-error { color: #b42318; font-size: 14px; }
-.auth-switch { justify-self: start; border: 0; padding: 0; color: var(--color-primary, #315bd6); background: none; font: inherit; cursor: pointer; }

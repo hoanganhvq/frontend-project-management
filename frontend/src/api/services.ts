@@ -98,10 +98,11 @@ export const aiSchedulesApi = {
     if (result.success === false) throw new ApiError(result.message || 'n8n could not process this schedule action.', response.status)
     return result
   },
-  generateFromPdf: async (file: File, leaderId: number) => {
+  generateFromPdf: async (file: File, leaderId: number, assignmentMode?: 'AUTO') => {
     const body = new FormData()
     body.set('file', file)
     body.set('leaderId', String(leaderId))
+    if (assignmentMode === 'AUTO') body.set('assignmentMode', assignmentMode)
 
     let response: Response
     try {

@@ -137,6 +137,11 @@
 .document-dropzone strong { max-width: 100%; overflow-wrap: anywhere; color: var(--color-ink-soft); }
 .document-dropzone span { max-width: 44rem; font-size: var(--font-size-xs); line-height: 1.5; }
 .document-dropzone input { max-width: 100%; }
+.planner-auto-assignment { display: flex; align-items: flex-start; padding: var(--space-4); gap: var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-surface); cursor: pointer; }
+.planner-auto-assignment input { width: 1.125rem; height: 1.125rem; flex: 0 0 auto; margin: .125rem 0 0; accent-color: var(--color-accent); }
+.planner-auto-assignment > span { display: grid; gap: var(--space-1); }
+.planner-auto-assignment strong { color: var(--color-ink-soft); font-size: var(--font-size-sm); }
+.planner-auto-assignment small { color: var(--color-muted); font-size: var(--font-size-xs); line-height: 1.5; }
 .planner-analysis-status { display: flex; min-width: 0; align-items: flex-start; padding: var(--space-4); gap: var(--space-3); border: 1px solid var(--color-amber-line); border-radius: var(--radius-md); background: var(--color-amber-soft); color: var(--color-amber); }
 .planner-analysis-status > svg { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; }
 .planner-analysis-status > div { min-width: 0; }

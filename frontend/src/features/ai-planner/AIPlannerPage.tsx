@@ -22,6 +22,7 @@ export function AIPlannerPage() {
   const { user, status: authStatus } = useAuth()
   const [step, setStep] = useState<'upload' | 'review' | 'complete'>('upload')
   const [file, setFile] = useState<File | null>(null)
+  const [autoAssignTasks, setAutoAssignTasks] = useState(false)
   const [error, setError] = useState('')
   const [scheduleId, setScheduleId] = useState<number | null>(null)
   const [schedule, setSchedule] = useState<AiScheduleResponse | null>(null)
@@ -143,7 +144,7 @@ export function AIPlannerPage() {
     setActionMessage('')
     setScheduleId(null)
     try {
-      const result = await aiSchedulesApi.generateFromPdf(file, user.id)
+      const result = await aiSchedulesApi.generateFromPdf(file, user.id, autoAssignTasks ? 'AUTO' : undefined)
       if (result?.success !== true || result.action !== 'pending') {
         throw new Error(result?.message || 'n8n did not confirm that the schedule was saved. You can retry this upload.')
       }
@@ -360,6 +361,11 @@ export function AIPlannerPage() {
           <input id="srs-file" type="file" accept="application/pdf,.pdf" required disabled={submitting} onChange={(event) => selectFile(event.target.files?.[0])} />
         </label>
 
+        <label className="planner-auto-assignment" htmlFor="auto-assign-tasks">
+          <input id="auto-assign-tasks" type="checkbox" checked={autoAssignTasks} disabled={submitting} onChange={(event) => setAutoAssignTasks(event.target.checked)} />
+          <span><strong>Automatically assign tasks</strong><small>Let AI suggest assignees from the available project members. Leave unchecked to keep tasks unassigned.</small></span>
+        </label>
+
         <div className="planner-step-card__actions">
           {file && <Button variant="secondary" disabled={submitting} onClick={() => selectFile(undefined)}>Remove file</Button>}
           <span className="planner-step-card__spacer" />
@@ -377,7 +383,7 @@ export function AIPlannerPage() {
         <p className="team-members-feedback team-members-feedback--success" role="status"><strong>{actionMessage}</strong></p>
         <div className="planner-step-card__actions">
           <span className="planner-step-card__spacer" />
-          <Button variant="secondary" onClick={() => { setFile(null); setSchedule(null); setDraftData(null); setScheduleId(null); setLastDecision(null); setActionMessage(''); setError(''); setStep('upload') }}>Generate another schedule</Button>
+          <Button variant="secondary" onClick={() => { setFile(null); setAutoAssignTasks(false); setSchedule(null); setDraftData(null); setScheduleId(null); setLastDecision(null); setActionMessage(''); setError(''); setStep('upload') }}>Generate another schedule</Button>
         </div>
       </div>
     </section> : <section className="content-panel planner-step-card" aria-labelledby="planner-review-heading">
