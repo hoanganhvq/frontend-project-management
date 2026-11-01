@@ -14,6 +14,7 @@ type WorkspaceContextValue = {
   persistenceNotice: string | null
   user: User
   refresh: () => Promise<void>
+  loadProject: (projectId: number) => Promise<void>
   createProject: (project: ProjectValues) => Promise<number>
   updateProject: (id: number, changes: Omit<Partial<Project>, 'id'>) => Promise<void>
   deleteProject: (id: number) => Promise<void>
@@ -89,6 +90,21 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
 
   useEffect(() => { void refresh() }, [refresh])
 
+  const loadProject = useCallback(async (projectId: number) => {
+    // A membership notification can arrive after the initial workspace snapshot.
+    // Query the protected resource instead of treating a cache miss as a denial.
+    const [project, taskRows] = await Promise.all([
+      projectsApi.getById(projectId), tasksApi.getByProject(projectId),
+    ])
+    const next = {
+      ...workspaceRef.current,
+      projects: [...workspaceRef.current.projects.filter((item) => item.id !== projectId), mapProject(project)],
+      tasks: [...workspaceRef.current.tasks.filter((item) => item.projectId !== projectId), ...taskRows.map(mapTask)],
+    }
+    workspaceRef.current = next
+    setWorkspace(next)
+  }, [])
+
   const createProject = useCallback(async (project: ProjectValues) => {
     try {
       const created = await projectsApi.create({ ...project, startDate: project.startDate || null, endDate: project.endDate || null, ownerId: user.id })
@@ -146,10 +162,10 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
   }, [refresh, reportError])
   const previewOnly = useCallback(() => undefined, [])
   const value = useMemo<WorkspaceContextValue>(() => ({
-    workspace, workspaceStatus, persistenceNotice, user, refresh, createProject, updateProject, deleteProject,
+    workspace, workspaceStatus, persistenceNotice, user, refresh, loadProject, createProject, updateProject, deleteProject,
     createTask, updateTask, deleteTask, addMilestones: previewOnly, markNotificationRead: previewOnly,
     markAllNotificationsRead: previewOnly, updateProfile: previewOnly, updatePreferences: previewOnly, resetDemoWorkspace: previewOnly,
-  }), [workspace, workspaceStatus, persistenceNotice, user, refresh, createProject, updateProject, deleteProject, createTask, updateTask, deleteTask, previewOnly])
+  }), [workspace, workspaceStatus, persistenceNotice, user, refresh, loadProject, createProject, updateProject, deleteProject, createTask, updateTask, deleteTask, previewOnly])
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }

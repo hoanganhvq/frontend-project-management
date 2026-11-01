@@ -50,7 +50,7 @@ async function executeRequest<T>(path: string, init: RequestInit): Promise<T> {
 
 export function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method ?? 'GET').toUpperCase()
-  if (method !== 'GET') return executeRequest<T>(path, init)
+  if (method !== 'GET' || init.cache === 'no-store') return executeRequest<T>(path, init)
 
   const key = `${API_BASE_URL}${path}`
   const existing = inFlightGets.get(key)

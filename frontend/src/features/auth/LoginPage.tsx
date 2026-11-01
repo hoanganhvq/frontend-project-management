@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type MouseEvent, type ReactNode } from 'react'
 import { useAuth } from '../../app/AuthProvider'
+import { APP_NAME, APP_SHORT_NAME, APP_TAGLINE } from '../../app/branding'
 import { ApiError } from '../../api/client'
 import type { LoginRequest, RegisterRequest } from '../../api/models'
 import { Button } from '../../components/ui/Button'
@@ -71,9 +72,9 @@ function AuthLink({ href, className, ariaLabel, children }: {
 }
 
 function Brand() {
-  return <AuthLink className="auth-brand" href="/login" ariaLabel="Orbit AI workspace home">
+  return <AuthLink className="auth-brand" href="/login" ariaLabel={APP_NAME}>
     <span className="auth-brand__mark" aria-hidden="true">O</span>
-    <span>Orbit<span>AI</span></span>
+    <span className="auth-brand__copy"><strong>{APP_SHORT_NAME}</strong><small>{APP_TAGLINE}</small></span>
   </AuthLink>
 }
 
@@ -111,7 +112,7 @@ function AuthLayout({ title, description, children }: { title: string; descripti
       </div>
       <WorkspacePanel />
     </section>
-    <footer className="auth-footer">© {new Date().getFullYear()} Orbit AI <span aria-hidden="true">·</span> Project management workspace</footer>
+    <footer className="auth-footer">© {new Date().getFullYear()} <span>{APP_NAME}</span></footer>
   </main>
 }
 
@@ -182,7 +183,7 @@ export function LoginPage() {
         {submitting ? <><span className="auth-spinner" aria-hidden="true" />Signing in…</> : 'Sign in'}
       </Button>
     </form>
-    <p className="auth-switch">New to Orbit AI? <AuthLink href={`/register${redirectQuery()}`}>Create an account</AuthLink></p>
+    <p className="auth-switch">Don’t have an account? <AuthLink href={`/register${redirectQuery()}`}>Create an account</AuthLink></p>
   </AuthLayout>
 }
 

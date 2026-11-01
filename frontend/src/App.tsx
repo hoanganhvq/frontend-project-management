@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './app/AuthProvider'
+import { NotificationProvider } from './app/NotificationProvider'
 import { DemoWorkspaceProvider } from './app/DemoWorkspaceProvider'
 import { useAppRoute, navigate, taskDetailSourcePath } from './app/router'
 import { AppShell } from './components/layout/AppShell'
@@ -105,5 +106,5 @@ export default function App() {
 function AuthenticatedApp() {
   const { user } = useAuth()
   if (!user) return <RoutedApp />
-  return <DemoWorkspaceProvider user={user}><RoutedApp /></DemoWorkspaceProvider>
+  return <NotificationProvider key={user.id}><DemoWorkspaceProvider user={user}><RoutedApp /></DemoWorkspaceProvider></NotificationProvider>
 }

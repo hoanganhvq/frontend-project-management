@@ -1,4 +1,11 @@
 import { ApiError, apiRequest } from './client'
+import type { AppNotification, NotificationPageResponse } from './models'
+
+export const notificationsApi = {
+  list: (page = 0, size = 20, unreadOnly = false) => apiRequest<NotificationPageResponse>(`/api/notifications?page=${page}&size=${size}&unreadOnly=${unreadOnly}`, { cache: 'no-store' }),
+  markRead: (id: number) => apiRequest<AppNotification>(`/api/notifications/${id}/read`, { method: 'PATCH' }),
+  markAllRead: () => apiRequest<void>('/api/notifications/read-all', { method: 'PATCH' }),
+}
 import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary, ApproveScheduleRequest, ApproveScheduleResponse, GenerateAiScheduleResponse, GroupMember, LoginRequest, N8nScheduleChatRequest, N8nScheduleChatResponse, ProjectGroup, ProjectGroupRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskAssignee, TaskDependency, TaskRequest, TaskResponse, TaskScheduleBatchUpdateRequest, TaskUpdateRequest, UpdatePendingScheduleRequest, UserResponse, UserUpdateRequest } from './models'
 
 export const authApi = {

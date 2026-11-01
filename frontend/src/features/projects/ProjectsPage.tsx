@@ -83,7 +83,7 @@ export function ProjectsPage({ openCreate = false }: { openCreate?: boolean }) {
 }
 
 export function ProjectDetailPage({ id }: { id: number }) {
-  const { workspace, workspaceStatus, refresh, user, updateProject, deleteProject, createTask } = useDemoWorkspace()
+  const { workspace, workspaceStatus, loadProject, user, updateProject, deleteProject, createTask } = useDemoWorkspace()
   const project = workspace.projects.find((item) => item.id === id)
   const tasks = useMemo(() => workspace.tasks.filter((task) => task.projectId === id), [workspace.tasks, id])
   const [formOpen, setFormOpen] = useState(false)
@@ -95,6 +95,21 @@ export function ProjectDetailPage({ id }: { id: number }) {
   const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | (typeof tasks)[number]['status']>('all')
   const [taskPriorityFilter, setTaskPriorityFilter] = useState<'all' | (typeof tasks)[number]['priority']>('all')
   const [taskDeadlineFilter, setTaskDeadlineFilter] = useState<DeadlineFilter>('all')
+  const [projectLookup, setProjectLookup] = useState<{ id: number; loading: boolean; error: string } | null>(null)
+  const [lookupRetry, setLookupRetry] = useState(0)
+  const hasProject = Boolean(project)
+
+  useEffect(() => {
+    if (hasProject || workspaceStatus === 'loading') return
+    let active = true
+    setProjectLookup({ id, loading: true, error: '' })
+    loadProject(id).then(() => {
+      if (active) setProjectLookup({ id, loading: false, error: '' })
+    }).catch((error: unknown) => {
+      if (active) setProjectLookup({ id, loading: false, error: error instanceof Error ? error.message : 'Could not load this project.' })
+    })
+    return () => { active = false }
+  }, [id, hasProject, workspaceStatus, loadProject, lookupRetry])
 
   const today = toLocalDateInput(new Date())
   const soonDate = new Date()
@@ -116,9 +131,8 @@ export function ProjectDetailPage({ id }: { id: number }) {
   }, [tasks, taskQuery, taskStatusFilter, taskPriorityFilter, taskDeadlineFilter, today, soon])
   const taskFiltersApplied = Boolean(taskQuery || taskStatusFilter !== 'all' || taskPriorityFilter !== 'all' || taskDeadlineFilter !== 'all')
 
-  if (!project && workspaceStatus === 'loading') return <section className="page-stack"><PageHeader title="Project details" description="Loading the selected server project." /><LoadingState label="Loading project…" /></section>
-  if (!project && workspaceStatus === 'error') return <section className="page-stack"><PageHeader title="Project details unavailable" description="The server project list could not be loaded." /><ErrorState title="Could not load project" detail="Retry the project service, then reopen this project." action={<Button onClick={() => void refresh()}>Try again</Button>} /></section>
-  if (!project) return <section className="page-stack"><PageHeader title="Project not found" description="This project is not in your server workspace." /><EmptyState title="Project unavailable" detail="Return to projects and choose an accessible project." action={<Button onClick={() => navigate('/projects')}>Back to projects</Button>} /></section>
+  if (!project && (workspaceStatus === 'loading' || projectLookup?.id !== id || projectLookup.loading)) return <section className="page-stack"><PageHeader title="Project details" description="Loading the selected server project." /><LoadingState label="Loading project…" /></section>
+  if (!project) return <section className="page-stack"><PageHeader title="Project details unavailable" description="The project could not be loaded from the server." /><ErrorState title="Could not load project" detail={projectLookup?.error || 'The project may have been deleted or your access may have changed.'} action={<Button onClick={() => setLookupRetry((value) => value + 1)}>Try again</Button>} /><Button variant="ghost" onClick={() => navigate('/projects')}>Back to projects</Button></section>
 
   const taskColumns: DataColumn<(typeof tasks)[number]>[] = [
     { key: 'title', header: 'Task', render: (task) => <button type="button" className="table-link" onClick={() => navigate(taskDetailPath(task.id, `/projects/${id}`))}>{task.title}<small>{task.description || 'No description'}</small></button> },

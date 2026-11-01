@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type R
 import { useTranslation } from 'react-i18next'
 import { authApi, usersApi } from '../../api/services'
 import { useAuth } from '../../app/AuthProvider'
+import { APP_NAME } from '../../app/branding'
 import i18n from '../../app/i18n'
 import { defaultSettings, getSettingsPreferences, saveSettingsPreferences, type SettingsAccent, type SettingsPreferences, type SettingsStartPage, type SettingsTheme } from '../../app/settingsPreferences'
 import { navigate } from '../../app/router'
@@ -138,7 +139,7 @@ export function SettingsPage() {
   }
 
   async function copySupportDetails() {
-    const details = [`OrbitAI ${APP_VERSION}`, `Page: ${window.location.pathname}`, `Language: ${preferences.language}`, `Theme: ${preferences.theme}`].join('\n')
+    const details = [`${APP_NAME} ${APP_VERSION}`, `Page: ${window.location.pathname}`, `Language: ${preferences.language}`, `Theme: ${preferences.theme}`].join('\n')
     try {
       await navigator.clipboard.writeText(details)
       setSupportNotice(t('supportCopied'))
@@ -297,7 +298,7 @@ export function SettingsPage() {
         </>}
 
         {activeTab === 'about' && <>
-          <div className="settings-panel-heading"><span className="settings-panel-heading__icon"><Icon name="inbox" /></span><div><h2>{t('aboutTitle')}</h2><p>{t('aboutHelp')}</p></div></div>
+          <div className="settings-panel-heading"><span className="settings-panel-heading__icon"><Icon name="inbox" /></span><div><h2>{APP_NAME}</h2><p>{t('aboutHelp')}</p></div></div>
           <dl className="settings-about-details"><div><dt>{t('version')}</dt><dd>{APP_VERSION}</dd></div><div><dt>{t('language')}</dt><dd>{t(preferences.language === 'vi' ? 'vietnamese' : preferences.language === 'ja' ? 'japanese' : 'english')}</dd></div></dl>
           <div className="settings-support-card"><div><h3>{t('support')}</h3><p>{t('supportHelp')}</p></div><div><Button variant="secondary" onClick={() => navigate('/profile')}>{t('profileTitle')}</Button><Button variant="primary" onClick={() => void copySupportDetails()}>{t('copySupport')}</Button></div></div>
           {supportNotice && <p className="settings-inline-notice" role="status">{supportNotice}</p>}

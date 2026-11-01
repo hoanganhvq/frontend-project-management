@@ -12,9 +12,5 @@ dist
 stats.html
 
 .eslintcache
-<<<<<<< HEAD
-
-# env
-.env
-=======
->>>>>>> dcdfc6e (integrating api)
+/test-results/
+/playwright-report/

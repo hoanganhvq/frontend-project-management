@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 const TRANSLATABLE_ATTRIBUTES = ['aria-label', 'aria-description', 'placeholder', 'title', 'alt']
+type TranslatedValue = { source: string; rendered: string }
 
 /**
  * Applies the app phrase catalog to rendered UI text, including text emitted by
@@ -11,8 +12,8 @@ const TRANSLATABLE_ATTRIBUTES = ['aria-label', 'aria-description', 'placeholder'
 export function LocalizedApp({ children }: { children: ReactNode }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const { i18n } = useTranslation('app')
-  const originalText = useRef(new WeakMap<Text, string>())
-  const originalAttributes = useRef(new WeakMap<Element, Map<string, string>>())
+  const originalText = useRef(new WeakMap<Text, TranslatedValue>())
+  const originalAttributes = useRef(new WeakMap<Element, Map<string, TranslatedValue>>())
 
   useLayoutEffect(() => {
     const root = rootRef.current
@@ -36,29 +37,31 @@ export function LocalizedApp({ children }: { children: ReactNode }) {
     }
 
     const translateText = (node: Text) => {
-      let source = originalText.current.get(node)
-      if (source === undefined) {
-        source = node.nodeValue ?? ''
-        originalText.current.set(node, source)
-      }
+      const current = node.nodeValue ?? ''
+      const previous = originalText.current.get(node)
+      // Preserve the original for language switches, but accept new values written by React.
+      const source = previous?.rendered === current ? previous.source : current
       const match = source.match(/^(\s*)([\s\S]*?)(\s*)$/)
       if (!match) return
       const value = translate(match[2])
       const next = `${match[1]}${value}${match[3]}`
+      originalText.current.set(node, { source, rendered: next })
       if (node.nodeValue !== next) node.nodeValue = next
     }
 
     const translateElement = (element: Element) => {
       let originals = originalAttributes.current.get(element)
       if (!originals) {
-        originals = new Map<string, string>()
+        originals = new Map<string, TranslatedValue>()
         originalAttributes.current.set(element, originals)
       }
       for (const attribute of TRANSLATABLE_ATTRIBUTES) {
-        if (!element.hasAttribute(attribute)) continue
-        if (!originals.has(attribute)) originals.set(attribute, element.getAttribute(attribute) ?? '')
-        const source = originals.get(attribute) ?? ''
+        if (!element.hasAttribute(attribute)) { originals.delete(attribute); continue }
+        const current = element.getAttribute(attribute) ?? ''
+        const previous = originals.get(attribute)
+        const source = previous?.rendered === current ? previous.source : current
         const value = translate(source)
+        originals.set(attribute, { source, rendered: value })
         if (element.getAttribute(attribute) !== value) element.setAttribute(attribute, value)
       }
     }

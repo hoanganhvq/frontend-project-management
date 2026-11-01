@@ -1,0 +1,12 @@
+.notifications-filters { display: flex; align-items: center; flex-wrap: wrap; padding: var(--space-4); gap: var(--space-2); border-bottom: 1px solid var(--color-line); }
+.notifications-filters > span { margin-left: auto; color: var(--color-muted); font-size: var(--font-size-xs); }
+.notifications-item { display: flex; align-items: flex-start; padding: var(--space-4) var(--space-5); gap: var(--space-3); border-bottom: 1px solid var(--color-line); }
+.notifications-item--unread { background: var(--color-accent-wash); }
+.notifications-item > .notification-preview__dot { flex: 0 0 auto; margin-top: .5rem; }
+.notifications-item__open { display: grid; min-width: 0; flex: 1; padding: 0; gap: var(--space-2); border: 0; background: transparent; color: var(--color-muted); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.notifications-item__open strong { color: var(--color-ink); font-size: var(--font-size-sm); }
+.notifications-item__open > span { white-space: pre-wrap; font-size: var(--font-size-sm); }
+.notifications-item__open time { color: var(--color-subtle); font-size: var(--font-size-xs); }
+.notifications-item__unread { display: inline-block; margin-left: var(--space-2); color: var(--color-accent-deep); font-size: var(--font-size-xs); }
+.notifications-pagination { display: flex; justify-content: space-between; align-items: center; padding: var(--space-4); gap: var(--space-2); color: var(--color-muted); font-size: var(--font-size-sm); }
+@media (max-width: 40rem) { .notifications-item { flex-wrap: wrap; padding: var(--space-3); } .notifications-item > .button { margin-left: var(--space-5); } }

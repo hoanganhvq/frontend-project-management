@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../app/AuthProvider'
+import { navigate } from '../../app/router'
 import { ApiError } from '../../api/client'
 import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary } from '../../api/models'
 import { aiSchedulesApi } from '../../api/services'
@@ -55,6 +56,14 @@ export function AIPlannerPage() {
 
   useEffect(() => { void refreshPendingDrafts() }, [])
 
+  const requestedDraftId = new URLSearchParams(window.location.search).get('scheduleId')
+  useEffect(() => {
+    if (!requestedDraftId) return
+    const id = Number(requestedDraftId)
+    if (Number.isSafeInteger(id) && id > 0) void openPendingDraft(id)
+    else setDraftListError('The notification contains an invalid draft ID.')
+  }, [requestedDraftId])
+
   function selectFile(candidate?: File) {
     setError('')
     setActionMessage('')
@@ -109,6 +118,7 @@ export function AIPlannerPage() {
       await loadAssignableMembers()
     } catch (requestError) {
       setDraftListError(requestError instanceof Error ? requestError.message : 'Could not open this pending draft.')
+      setStep('upload')
     } finally {
       setLoadingSchedule(false)
     }
@@ -176,6 +186,7 @@ export function AIPlannerPage() {
     setError('')
     setActionMessage('')
     setStep('upload')
+    if (requestedDraftId) navigate('/ai-planner')
   }
 
   const visibleMembers = useMemo(() => {

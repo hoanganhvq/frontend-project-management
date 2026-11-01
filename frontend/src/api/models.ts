@@ -53,3 +53,16 @@ export type ApproveScheduleResponse = { success: boolean; projectId: number; tot
 export type RejectScheduleRequest = { scheduleId: number; reason: string }
 export type RejectScheduleResponse = { success: boolean; message: string }
 export type GenerateAiScheduleResponse = { success: boolean; action: string; message?: string; scheduleId?: number }
+export type AppNotification = {
+  id: number
+  type: 'PROJECT_MEMBER_ADDED' | 'TASK_ASSIGNED' | 'TASK_UPDATED' | 'TASK_COMPLETED' | 'AI_DRAFT_READY' | 'AI_PROJECT_READY'
+  title: string
+  message: string
+  actorId: number | null
+  projectId: number | null
+  taskId: number | null
+  scheduleId: number | null
+  createdAt: string
+  readAt: string | null
+}
+export type NotificationPageResponse = { content: AppNotification[]; totalElements: number; totalPages: number; page: number; size: number; unreadCount: number }

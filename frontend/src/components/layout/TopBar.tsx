@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useDemoWorkspace } from '../../app/DemoWorkspaceProvider'
+import { useNotifications } from '../../app/NotificationProvider'
+import type { AppNotification } from '../../api/models'
+import { notificationPath, notificationTone } from '../../features/notifications/notificationLinks'
 import { getSettingsPreferences, saveSettingsPreferences } from '../../app/settingsPreferences'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
@@ -28,8 +31,8 @@ export function TopBar({ onMenu, menuExpanded, menuButtonRef, pageTitle, onNavig
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchTriggerRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLElement>(null)
-  const { workspace, markNotificationRead, markAllNotificationsRead } = useDemoWorkspace()
-  const unreadCount = workspace.notifications.filter((notification) => !notification.read).length
+  const { workspace } = useDemoWorkspace()
+  const { recent, unreadCount, loading: notificationsLoading, busy: notificationsBusy, error: notificationsError, refresh: refreshNotifications, markRead, markAllRead } = useNotifications()
   const searchItems = useMemo(() => {
     const projects: SearchItem[] = workspace.projects.map((project) => ({ title: project.name, detail: project.description || 'Project', href: `/projects/${project.id}`, icon: 'folder' }))
     const tasks: SearchItem[] = workspace.tasks.map((task) => ({ title: task.title, detail: `${workspace.projects.find((project) => project.id === task.projectId)?.name ?? 'Task'} · ${task.description || 'Task'}`, href: taskDetailPath(task.id, '/tasks'), icon: 'board' }))
@@ -55,6 +58,7 @@ export function TopBar({ onMenu, menuExpanded, menuButtonRef, pageTitle, onNavig
         : [{ label: 'Workspace', href: '/dashboard' }, { label: pageTitle }]
   useEffect(() => {
     if (!noticeOpen) return
+    void refreshNotifications()
     popoverRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
     const onPointerDown = (event: PointerEvent) => {
       if (!popoverRef.current?.contains(event.target as Node) && !notificationButtonRef.current?.contains(event.target as Node)) setNoticeOpen(false)
@@ -71,7 +75,7 @@ export function TopBar({ onMenu, menuExpanded, menuButtonRef, pageTitle, onNavig
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [noticeOpen])
+  }, [noticeOpen, refreshNotifications])
   useEffect(() => {
     if (!searchOpen) return
     searchInputRef.current?.focus()
@@ -113,6 +117,14 @@ export function TopBar({ onMenu, menuExpanded, menuButtonRef, pageTitle, onNavig
     saveSettingsPreferences({ ...current, theme: darkNow ? 'light' : 'dark' })
   }
 
+  async function openNotification(notification: AppNotification) {
+    try {
+      if (!notification.readAt) await markRead(notification.id)
+      setNoticeOpen(false)
+      navigate(notificationPath(notification))
+    } catch { /* Keep the popover open and display the provider's error. */ }
+  }
+
   return <>
   <header className="topbar">
     <button ref={menuButtonRef} className="topbar__menu icon-button" aria-label={menuExpanded ? 'Navigation open' : 'Open navigation'} aria-expanded={menuExpanded} aria-controls="main-sidebar" onClick={onMenu}><Icon name="menu" /></button>
@@ -122,12 +134,14 @@ export function TopBar({ onMenu, menuExpanded, menuButtonRef, pageTitle, onNavig
       <Button variant="ghost" className="topbar__search-mobile" aria-label="Search anything" onClick={() => setSearchOpen(true)}><Icon name="search" /></Button>
       <div className="notification-menu">
         <Button ref={notificationButtonRef} variant="ghost" className="topbar__notification" aria-label={`Notifications, ${unreadCount} unread`} aria-haspopup="dialog" aria-expanded={noticeOpen} aria-controls="notification-popover" onClick={() => setNoticeOpen((value) => !value)}><Icon name="bell" />{unreadCount > 0 && <span className="notification-count">{unreadCount}</span>}</Button>
-        {noticeOpen && <section ref={popoverRef} id="notification-popover" className="notification-popover" role="dialog" aria-label="Recent demo notifications">
-          <div className="notification-popover__header"><div><strong>Notifications</strong><span>{unreadCount ? `${unreadCount} unread demo alerts` : 'All caught up'}</span></div><div className="notification-popover__actions">{unreadCount > 0 && <button type="button" className="notification-text-action" onClick={markAllNotificationsRead}>Mark all read</button>}<button type="button" className="icon-button" aria-label="Close notifications" onClick={() => { setNoticeOpen(false); notificationButtonRef.current?.focus() }}><Icon name="close" /></button></div></div>
-          {workspace.notifications.length === 0 && <div className="notification-popover__empty"><strong>You’re all caught up</strong><span>New workspace activity will appear here.</span></div>}
-          {workspace.notifications.slice(0, 4).map((notification) => <button key={notification.id} type="button" className={`notification-preview${notification.read ? '' : ' notification-preview--unread'}`} onClick={() => markNotificationRead(notification.id)}>
-            <span className={`notification-preview__dot notification-preview__dot--${notification.tone}`} aria-hidden="true" />
-            <span><strong>{notification.title}</strong><small>{notification.detail}</small></span>
+        {noticeOpen && <section ref={popoverRef} id="notification-popover" className="notification-popover" role="dialog" aria-label="Recent notifications">
+          <div className="notification-popover__header"><div><strong>Notifications</strong><span>{unreadCount ? `${unreadCount} unread notifications` : 'All caught up'}</span></div><div className="notification-popover__actions">{unreadCount > 0 && <button type="button" className="notification-text-action" disabled={notificationsBusy} onClick={() => void markAllRead().catch(() => undefined)}>Mark all read</button>}<button type="button" className="icon-button" aria-label="Close notifications" onClick={() => { setNoticeOpen(false); notificationButtonRef.current?.focus() }}><Icon name="close" /></button></div></div>
+          {notificationsError && <div className="notification-popover__empty" role="alert"><span>{notificationsError}</span><Button size="sm" onClick={() => void refreshNotifications()}>Try again</Button></div>}
+          {notificationsLoading && <div className="notification-popover__empty" role="status">Loading notifications…</div>}
+          {!notificationsLoading && !notificationsError && recent.length === 0 && <div className="notification-popover__empty"><strong>You’re all caught up</strong><span>New workspace activity will appear here.</span></div>}
+          {recent.map((notification) => <button key={notification.id} type="button" disabled={notificationsBusy} className={`notification-preview${notification.readAt ? '' : ' notification-preview--unread'}`} onClick={() => void openNotification(notification)}>
+            <span className={`notification-preview__dot notification-preview__dot--${notificationTone(notification)}`} aria-hidden="true" />
+            <span><strong>{notification.title}</strong><small>{notification.message}</small></span>
           </button>)}
           <button type="button" className="notification-view-all" onClick={() => { setNoticeOpen(false); onNavigate('Notifications') }}>View all notifications <Icon name="arrow" /></button>
         </section>}
