@@ -17,7 +17,7 @@ export type SettingsPreferences = {
   numberLocale: 'en-US' | 'vi-VN' | 'ja-JP'
   weekStartsOn: 'monday' | 'sunday'
   startPage: SettingsStartPage
-  defaultTaskStatus: 'todo' | 'in_progress' | 'done' | 'canceled'
+  defaultTaskStatus: 'todo' | 'in_progress' | 'review' | 'done' | 'canceled'
   defaultProjectView: SettingsProjectView
   notificationInApp: boolean
   notificationAssignments: boolean
@@ -67,7 +67,7 @@ export function getSettingsPreferences(): SettingsPreferences {
       ...defaultSettings, ...value, language: validLanguage, dateFormat, timeZone, startPage,
       timeFormat: value?.timeFormat === '12-hour' ? '12-hour' : '24-hour',
       numberLocale: value?.numberLocale === 'vi-VN' || value?.numberLocale === 'ja-JP' ? value.numberLocale : 'en-US',
-      defaultTaskStatus: value?.defaultTaskStatus === 'in_progress' || value?.defaultTaskStatus === 'done' || value?.defaultTaskStatus === 'canceled' ? value.defaultTaskStatus : 'todo',
+      defaultTaskStatus: value?.defaultTaskStatus === 'review' || value?.defaultTaskStatus === 'in_progress' || value?.defaultTaskStatus === 'done' || value?.defaultTaskStatus === 'canceled' ? value.defaultTaskStatus : 'todo',
       defaultProjectView: value?.defaultProjectView === 'cards' ? 'cards' : 'list',
       notificationInApp: value?.notificationInApp ?? true,
       notificationAssignments: value?.notificationAssignments ?? true,

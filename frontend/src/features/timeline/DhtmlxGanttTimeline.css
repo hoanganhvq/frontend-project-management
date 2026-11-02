@@ -54,6 +54,7 @@
 }
 .timeline-gantt-host .timeline-gantt-task--todo { background: #748197; }
 .timeline-gantt-host .timeline-gantt-task--active { background: var(--color-accent); }
+.timeline-gantt-host .timeline-gantt-task--review { background: var(--color-accent-deep); }
 .timeline-gantt-host .timeline-gantt-task--review { background: #7250c7; }
 .timeline-gantt-host .timeline-gantt-task--done { background: #16835a; }
 .timeline-gantt-host .gantt_task_progress { border-radius: 6px 0 0 6px; background: rgb(255 255 255 / 28%); }

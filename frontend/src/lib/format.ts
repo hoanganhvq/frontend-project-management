@@ -34,7 +34,8 @@ export function projectTone(status: ProjectStatus): 'blue' | 'green' | 'gray' {
   return 'blue'
 }
 
-export function taskTone(status: TaskStatus): 'blue' | 'green' | 'gray' | 'amber' {
+export function taskTone(status: TaskStatus): 'blue' | 'green' | 'gray' | 'amber' | 'purple' {
+  if (status === 'review') return 'purple'
   if (status === 'done') return 'green'
   if (status === 'canceled') return 'gray'
   if (status === 'in_progress') return 'blue'

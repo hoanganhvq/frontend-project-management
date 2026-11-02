@@ -1,7 +1,7 @@
 export type ProjectStatus = 'in_progress' | 'completed' | 'cancelled'
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'canceled'
+export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'canceled'
 export type TaskPriority = 'low' | 'medium' | 'high'
-export type TaskBoardColumn = 'todo' | 'in_progress' | 'done'
+export type TaskBoardColumn = 'todo' | 'in_progress' | 'review' | 'done'
 
 export type Project = {
   id: number
@@ -73,12 +73,12 @@ export type DemoWorkspace = {
   preferences: DemoPreferences
 }
 
-export const TASK_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'done', 'canceled']
+export const TASK_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'review', 'done', 'canceled']
 export const TASK_PRIORITIES: TaskPriority[] = ['low', 'medium', 'high']
 export const PROJECT_STATUSES: ProjectStatus[] = ['in_progress', 'completed', 'cancelled']
 
 export function taskStatusLabel(status: TaskStatus): string {
-  return { todo: 'To do', in_progress: 'In progress', done: 'Done', canceled: 'Canceled' }[status]
+  return { todo: 'To do', in_progress: 'In progress', review: 'Review', done: 'Done', canceled: 'Canceled' }[status]
 }
 
 export function taskPriorityLabel(priority: TaskPriority): string {
@@ -92,5 +92,6 @@ export function projectStatusLabel(status: ProjectStatus): string {
 export function taskBoardColumn(task: Task): TaskBoardColumn {
   if (task.boardColumn) return task.boardColumn
   if (task.status === 'done') return 'done'
+  if (task.status === 'review') return 'review'
   return task.status === 'todo' ? 'todo' : 'in_progress'
 }

@@ -191,7 +191,7 @@ export function SettingsPage() {
           </form>
           <div className="settings-options">
             <OptionRow title={t('defaultProjectView')} description={t('savedLocally')}><Select id="settings-default-project-view" aria-label={t('defaultProjectView')} value={preferences.defaultProjectView} onChange={(event) => update('defaultProjectView', event.target.value as SettingsPreferences['defaultProjectView'])} options={[{ value: 'list', label: t('projectViewList') }, { value: 'cards', label: t('projectViewCards') }]} /></OptionRow>
-            <OptionRow title={t('defaultTaskWorkflow')} description={t('defaultTaskStatusHelp')}><Select id="settings-default-task-status" aria-label={t('defaultTaskWorkflow')} value={preferences.defaultTaskStatus} onChange={(event) => update('defaultTaskStatus', event.target.value as SettingsPreferences['defaultTaskStatus'])} options={[{ value: 'todo', label: t('statusTodo') }, { value: 'in_progress', label: t('statusInProgress') }, { value: 'done', label: t('statusDone') }, { value: 'canceled', label: t('statusCanceled') }]} /></OptionRow>
+            <OptionRow title={t('defaultTaskWorkflow')} description={t('defaultTaskStatusHelp')}><Select id="settings-default-task-status" aria-label={t('defaultTaskWorkflow')} value={preferences.defaultTaskStatus} onChange={(event) => update('defaultTaskStatus', event.target.value as SettingsPreferences['defaultTaskStatus'])} options={[{ value: 'todo', label: t('statusTodo') }, { value: 'in_progress', label: t('statusInProgress') }, { value: 'review', label: t('statusReview') }, { value: 'done', label: t('statusDone') }, { value: 'canceled', label: t('statusCanceled') }]} /></OptionRow>
           </div>
         </>}
 

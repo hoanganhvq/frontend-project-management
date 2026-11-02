@@ -22,9 +22,7 @@ type Props = {
 
 function initialValues(projectId: number, task?: Task, initialBoardColumn?: TaskBoardColumn): TaskValues {
   const defaultStatus = getSettingsPreferences().defaultTaskStatus
-  const status = initialBoardColumn === 'done' ? 'done'
-    : initialBoardColumn === 'in_progress' ? 'in_progress'
-      : initialBoardColumn === 'todo' ? 'todo' : defaultStatus
+  const status = initialBoardColumn ?? defaultStatus
   const boardColumn = status === 'canceled' ? undefined : status
   return task
     ? { projectId: task.projectId, groupId: task.groupId, parentTaskId: task.parentTaskId, title: task.title, description: task.description, startDate: task.startDate, endDate: task.endDate, progress: task.progress, priority: task.priority, status: task.status, boardColumn: task.boardColumn, assigneeName: task.assigneeName ?? '', module: task.module ?? '', estimateHours: task.estimateHours, dependencyIds: task.dependencyIds ?? [] }
@@ -84,7 +82,7 @@ export function TaskFormDialog({ open, projectId, task, initialBoardColumn, onCl
         <span className="form-field__message">Choose a group in this project, or leave the task ungrouped.</span>
       </div>
       <div className="form-grid__two">
-        <Select label="Status" id="task-status" value={values.status} onChange={(event) => { const status = event.target.value as TaskStatus; setValues({ ...values, status, boardColumn: status === 'todo' ? 'todo' : status === 'done' ? 'done' : status === 'in_progress' ? 'in_progress' : undefined }) }} options={[{ value: 'todo', label: 'To do' }, { value: 'in_progress', label: 'In progress' }, { value: 'done', label: 'Done' }, { value: 'canceled', label: 'Canceled' }]} />
+        <Select label="Status" id="task-status" value={values.status} onChange={(event) => { const status = event.target.value as TaskStatus; setValues({ ...values, status, boardColumn: status === 'canceled' ? undefined : status }) }} options={[{ value: 'todo', label: 'To do' }, { value: 'in_progress', label: 'In progress' }, { value: 'review', label: 'Review' }, { value: 'done', label: 'Done' }, { value: 'canceled', label: 'Canceled' }]} />
         <Select label="Priority" id="task-priority" value={values.priority} onChange={(event) => setValues({ ...values, priority: event.target.value as TaskPriority })} options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]} />
       </div>
       <FormField label="Progress" htmlFor="task-progress" hint="Percentage complete (0–100)."><Input id="task-progress" type="number" min={0} max={100} value={values.progress} onChange={(event) => setValues({ ...values, progress: Number(event.target.value) })} /></FormField>

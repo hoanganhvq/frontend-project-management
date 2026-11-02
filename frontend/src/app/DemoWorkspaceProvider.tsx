@@ -48,7 +48,7 @@ function mapTask(task: TaskResponse): Task {
     id: task.id, projectId: task.projectId, groupId: task.groupId, parentTaskId: task.parentTaskId,
     title: task.title, description: task.description ?? '', startDate: task.startDate ?? '', endDate: task.endDate ?? '',
     progress: task.progress ?? 0, priority: task.priority, status: task.status,
-    boardColumn: task.status === 'done' ? 'done' : task.status === 'todo' ? 'todo' : 'in_progress',
+    boardColumn: task.status === 'canceled' ? undefined : task.status,
     createdByName: task.createdByName ?? '', createdAt: task.createdAt ?? '',
   }
 }
@@ -147,7 +147,7 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
   const updateTask = useCallback(async (id: number, changes: Omit<Partial<Task>, 'id' | 'projectId'>) => {
     const task = workspaceRef.current.tasks.find((item) => item.id === id)
     if (!task) throw new Error('This task is no longer available. Refresh the page and try again.')
-    const status = changes.status ?? (changes.boardColumn === 'done' ? 'done' : changes.boardColumn === 'todo' ? 'todo' : changes.boardColumn ? 'in_progress' : task.status)
+    const status = changes.status ?? changes.boardColumn ?? task.status
     try {
       const updated = await tasksApi.update(id, {
         groupId: changes.groupId ?? task.groupId, parentTaskId: changes.parentTaskId ?? task.parentTaskId,

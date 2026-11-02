@@ -15,7 +15,7 @@ function normalizeProjectStatus(status: ProjectStatus): ProjectStatus {
 }
 
 function normalizeTaskStatus(status: TaskStatus): TaskStatus {
-  return status === 'done' || status === 'in_progress' || status === 'canceled' ? status : 'todo'
+  return status === 'review' || status === 'done' || status === 'in_progress' || status === 'canceled' ? status : 'todo'
 }
 
 export function DashboardPage() {
@@ -26,7 +26,7 @@ export function DashboardPage() {
   const activeProjects = useMemo(() => data.projects.filter((project) => normalizeProjectStatus(project.status) === 'in_progress'), [data.projects])
   const openTasks = useMemo(() => data.tasks.filter((task) => {
     const status = normalizeTaskStatus(task.status)
-    return status === 'todo' || status === 'in_progress'
+    return status === 'todo' || status === 'in_progress' || status === 'review'
   }), [data.tasks])
   const completedTasks = data.tasks.filter((task) => normalizeTaskStatus(task.status) === 'done').length
   const today = toLocalDateInput(new Date())
@@ -48,7 +48,7 @@ export function DashboardPage() {
     {workspaceStatus === 'loading' ? <LoadingState label="Loading your projects and tasks…" /> : workspaceStatus === 'error' ? <ErrorState title="Dashboard could not load" detail="The project service could not load your workspace. Check the connection and retry." action={<Button variant="secondary" onClick={() => void refresh()}>Try again</Button>} /> : <>
       <section className="metric-grid" aria-label="Project and task summary">
         <article className="metric-card"><span>Active projects</span><strong>{formatNumber(activeProjects.length)}</strong><small>Projects in progress</small></article>
-        <article className="metric-card"><span>Open tasks</span><strong>{formatNumber(openTasks.length)}</strong><small>To do or in progress</small></article>
+        <article className="metric-card"><span>Open tasks</span><strong>{formatNumber(openTasks.length)}</strong><small>To do, in progress, or review</small></article>
         <article className="metric-card"><span>Completed tasks</span><strong>{formatNumber(completedTasks)}</strong><small>Across accessible projects</small></article>
         <article className="metric-card"><span>Overdue tasks</span><strong>{formatNumber(overdueTasks.length)}</strong><small>Open tasks past their due date</small></article>
         <article className="metric-card"><span>Due in 7 days</span><strong>{formatNumber(dueSoonTasks.length)}</strong><small>Including tasks due today</small></article>

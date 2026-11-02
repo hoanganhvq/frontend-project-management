@@ -22,6 +22,7 @@ import { TaskAssignees } from './TaskAssignees'
 const boardColumns: Array<{ id: TaskBoardColumn; title: string; tone: string }> = [
   { id: 'todo', title: 'To do', tone: 'gray' },
   { id: 'in_progress', title: 'In progress', tone: 'blue' },
+  { id: 'review', title: 'Review', tone: 'purple' },
   { id: 'done', title: 'Done', tone: 'green' },
 ]
 

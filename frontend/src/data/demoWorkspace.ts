@@ -116,9 +116,9 @@ export function isDemoWorkspace(value: unknown): value is DemoWorkspace {
     && typeof (item as DemoWorkspace['tasks'][number]).id === 'number'
     && typeof (item as DemoWorkspace['tasks'][number]).projectId === 'number'
     && typeof (item as DemoWorkspace['tasks'][number]).title === 'string'
-    && ['todo', 'in_progress', 'done', 'canceled'].includes((item as DemoWorkspace['tasks'][number]).status)
+    && ['todo', 'in_progress', 'review', 'done', 'canceled'].includes((item as DemoWorkspace['tasks'][number]).status)
     && ['low', 'medium', 'high'].includes((item as DemoWorkspace['tasks'][number]).priority)
-    && ((item as DemoWorkspace['tasks'][number]).boardColumn === undefined || ['todo', 'in_progress', 'done'].includes((item as DemoWorkspace['tasks'][number]).boardColumn!))
+    && ((item as DemoWorkspace['tasks'][number]).boardColumn === undefined || ['todo', 'in_progress', 'review', 'done'].includes((item as DemoWorkspace['tasks'][number]).boardColumn!))
   const profile = candidate.profile as DemoWorkspace['profile'] | undefined
   const preferences = candidate.preferences as DemoWorkspace['preferences'] | undefined
   return Array.isArray(candidate.projects) && candidate.projects.every(validProject)

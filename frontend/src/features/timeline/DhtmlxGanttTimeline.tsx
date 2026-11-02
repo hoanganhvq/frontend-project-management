@@ -39,6 +39,7 @@ function addCalendarDays(value: Date, days: number): Date {
 }
 
 function taskColor(task: Task): string {
+  if (task.status === 'review') return 'timeline-gantt-task--review'
   if (task.boardColumn === 'done' || task.status === 'done') return 'timeline-gantt-task--done'
   if (task.boardColumn === 'in_progress' || task.status === 'in_progress') return 'timeline-gantt-task--active'
   return 'timeline-gantt-task--todo'
