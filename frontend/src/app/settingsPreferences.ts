@@ -19,9 +19,6 @@ export type SettingsPreferences = {
   startPage: SettingsStartPage
   defaultTaskStatus: 'todo' | 'in_progress' | 'done' | 'canceled'
   defaultProjectView: SettingsProjectView
-  workspaceName: string
-  workspaceDescription: string
-  workspaceLogoDataUrl: string
   notificationInApp: boolean
   notificationAssignments: boolean
   notificationTaskUpdates: boolean
@@ -40,7 +37,7 @@ export const defaultSettings: SettingsPreferences = {
   dateFormat: 'dd-mm-yyyy', timeFormat: '24-hour',
   timeZone: typeof Intl === 'undefined' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   numberLocale: 'en-US', weekStartsOn: 'monday', startPage: 'dashboard', defaultTaskStatus: 'todo',
-  defaultProjectView: 'list', workspaceName: 'My workspace', workspaceDescription: '', workspaceLogoDataUrl: '',
+  defaultProjectView: 'list',
   notificationInApp: true, notificationAssignments: true, notificationTaskUpdates: true,
   notificationCommentsMentions: true, notificationProjectUpdates: true, notificationAiPlanner: true,
   notificationEmail: true, notificationDoNotDisturb: false, weeklySummary: false,
@@ -50,7 +47,7 @@ export function getSettingsPreferences(): SettingsPreferences {
   if (typeof window === 'undefined') return defaultSettings
   try {
     const raw = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null') as Record<string, unknown> | null
-    const value = raw as Partial<SettingsPreferences> | null
+    const value = Object.fromEntries(Object.entries(raw ?? {}).filter(([key]) => key in defaultSettings)) as Partial<SettingsPreferences>
     const validLanguage = value?.language === 'vi' || value?.language === 'ja' ? value.language : 'en'
     let timeZone = defaultSettings.timeZone
     try {
@@ -72,9 +69,6 @@ export function getSettingsPreferences(): SettingsPreferences {
       numberLocale: value?.numberLocale === 'vi-VN' || value?.numberLocale === 'ja-JP' ? value.numberLocale : 'en-US',
       defaultTaskStatus: value?.defaultTaskStatus === 'in_progress' || value?.defaultTaskStatus === 'done' || value?.defaultTaskStatus === 'canceled' ? value.defaultTaskStatus : 'todo',
       defaultProjectView: value?.defaultProjectView === 'cards' ? 'cards' : 'list',
-      workspaceName: typeof value?.workspaceName === 'string' ? value.workspaceName : defaultSettings.workspaceName,
-      workspaceDescription: typeof value?.workspaceDescription === 'string' ? value.workspaceDescription : '',
-      workspaceLogoDataUrl: typeof value?.workspaceLogoDataUrl === 'string' ? value.workspaceLogoDataUrl : '',
       notificationInApp: value?.notificationInApp ?? true,
       notificationAssignments: value?.notificationAssignments ?? true,
       notificationTaskUpdates: value?.notificationTaskUpdates ?? (typeof raw?.taskUpdates === 'boolean' ? raw.taskUpdates : true),
