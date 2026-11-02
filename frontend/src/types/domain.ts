@@ -13,7 +13,10 @@ export type Project = {
   status: ProjectStatus
 }
 
+export type TaskAssigneeSummary = { userId: number; userName: string; avatarUrl: string | null }
+
 export type Task = {
+  assignees?: TaskAssigneeSummary[]
   id: number
   projectId: number
   groupId: number | null

@@ -3,7 +3,7 @@ import { authApi, projectMembersApi, projectsApi, tasksApi } from '../api/servic
 import { ApiError } from '../api/client'
 import { useAuth } from './AuthProvider'
 import type { ProjectResponse, TaskResponse } from '../api/models'
-import type { DemoPreferences, DemoWorkspace, Project, ProjectMilestone, ProjectStatus, Task, UserProfile } from '../types/domain'
+import type { DemoPreferences, DemoWorkspace, Project, ProjectMilestone, ProjectStatus, Task, TaskAssigneeSummary, UserProfile } from '../types/domain'
 
 type ProjectValues = Omit<Project, 'id'>
 type TaskValues = Omit<Task, 'id' | 'createdAt' | 'createdByName'>
@@ -15,6 +15,7 @@ type WorkspaceContextValue = {
   user: User
   refresh: () => Promise<void>
   loadProject: (projectId: number) => Promise<void>
+  setTaskAssignees: (taskId: number, assignees: TaskAssigneeSummary[]) => void
   createProject: (project: ProjectValues) => Promise<number>
   updateProject: (id: number, changes: Omit<Partial<Project>, 'id'>) => Promise<void>
   deleteProject: (id: number) => Promise<void>
@@ -43,6 +44,7 @@ function mapProject(project: ProjectResponse): Project {
 
 function mapTask(task: TaskResponse): Task {
   return {
+    assignees: task.assignees ?? [],
     id: task.id, projectId: task.projectId, groupId: task.groupId, parentTaskId: task.parentTaskId,
     title: task.title, description: task.description ?? '', startDate: task.startDate ?? '', endDate: task.endDate ?? '',
     progress: task.progress ?? 0, priority: task.priority, status: task.status,
@@ -147,25 +149,32 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
     if (!task) throw new Error('This task is no longer available. Refresh the page and try again.')
     const status = changes.status ?? (changes.boardColumn === 'done' ? 'done' : changes.boardColumn === 'todo' ? 'todo' : changes.boardColumn ? 'in_progress' : task.status)
     try {
-      await tasksApi.update(id, {
+      const updated = await tasksApi.update(id, {
         groupId: changes.groupId ?? task.groupId, parentTaskId: changes.parentTaskId ?? task.parentTaskId,
         title: changes.title ?? task.title, description: changes.description ?? task.description,
         startDate: (changes.startDate ?? task.startDate) || null, endDate: (changes.endDate ?? task.endDate) || null,
         progress: changes.progress ?? (status === 'done' ? 100 : task.progress), priority: changes.priority ?? task.priority, status,
       })
-      await refresh()
+      const next = { ...workspaceRef.current, tasks: workspaceRef.current.tasks.map((item) => item.id === id ? mapTask(updated) : item) }
+      workspaceRef.current = next
+      setWorkspace(next)
     } catch (error) { reportError(error); throw error }
-  }, [refresh, reportError])
+  }, [reportError])
 
   const deleteTask = useCallback(async (id: number) => {
     try { await tasksApi.delete(id); await refresh() } catch (error) { reportError(error); throw error }
   }, [refresh, reportError])
+  const setTaskAssignees = useCallback((taskId: number, assignees: TaskAssigneeSummary[]) => {
+    const next = { ...workspaceRef.current, tasks: workspaceRef.current.tasks.map((task) => task.id === taskId ? { ...task, assignees } : task) }
+    workspaceRef.current = next
+    setWorkspace(next)
+  }, [])
   const previewOnly = useCallback(() => undefined, [])
   const value = useMemo<WorkspaceContextValue>(() => ({
-    workspace, workspaceStatus, persistenceNotice, user, refresh, loadProject, createProject, updateProject, deleteProject,
+    workspace, workspaceStatus, persistenceNotice, user, refresh, loadProject, setTaskAssignees, createProject, updateProject, deleteProject,
     createTask, updateTask, deleteTask, addMilestones: previewOnly, markNotificationRead: previewOnly,
     markAllNotificationsRead: previewOnly, updateProfile: previewOnly, updatePreferences: previewOnly, resetDemoWorkspace: previewOnly,
-  }), [workspace, workspaceStatus, persistenceNotice, user, refresh, loadProject, createProject, updateProject, deleteProject, createTask, updateTask, deleteTask, previewOnly])
+  }), [workspace, workspaceStatus, persistenceNotice, user, refresh, loadProject, setTaskAssignees, createProject, updateProject, deleteProject, createTask, updateTask, deleteTask, previewOnly])
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }

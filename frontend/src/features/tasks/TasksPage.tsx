@@ -17,6 +17,7 @@ import { taskStatusLabel } from '../../types/domain'
 import { taskBoardColumn } from '../../types/domain'
 import type { Task, TaskBoardColumn } from '../../types/domain'
 import { TaskFormDialog } from './TaskFormDialog'
+import { TaskAssignees } from './TaskAssignees'
 
 const boardColumns: Array<{ id: TaskBoardColumn; title: string; tone: string }> = [
   { id: 'todo', title: 'To do', tone: 'gray' },
@@ -33,10 +34,7 @@ export function TasksPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [createColumn, setCreateColumn] = useState<TaskBoardColumn | undefined>()
   const [editTask, setEditTask] = useState<Task | undefined>()
-  const [assigneeNames, setAssigneeNames] = useState<Record<number, string>>({})
   const [groupNames, setGroupNames] = useState<Record<number, string>>({})
-  const [assigneeError, setAssigneeError] = useState('')
-  const [assigneeLoading, setAssigneeLoading] = useState(false)
   const today = toLocalDateInput(new Date())
   const soonDate = new Date()
   soonDate.setDate(soonDate.getDate() + 3)
@@ -47,27 +45,6 @@ export function TasksPage() {
     && (deadline === 'all' || (deadline === 'overdue' ? !!task.endDate && task.endDate < today && task.status !== 'done' : deadline === 'soon' ? !!task.endDate && task.endDate >= today && task.endDate <= soon : !task.endDate))
     && `${task.title} ${task.description}`.toLowerCase().includes(query.trim().toLowerCase())),
   [workspace.tasks, projectId, priority, deadline, today, soon, query])
-
-  useEffect(() => {
-    let active = true
-    if (workspaceStatus !== 'ready' || workspace.tasks.length === 0) {
-      setAssigneeNames({})
-      setAssigneeError('')
-      setAssigneeLoading(false)
-      return
-    }
-    setAssigneeLoading(true)
-    setAssigneeError('')
-    Promise.all(workspace.tasks.map(async (task) => {
-      const assignees = await tasksApi.getAssignees(task.id)
-      return [task.id, assignees.map((assignee) => assignee.userName).join(', ')] as const
-    })).then((rows) => {
-      if (active) setAssigneeNames(Object.fromEntries(rows))
-    }).catch((error: unknown) => {
-      if (active) setAssigneeError(error instanceof Error ? error.message : 'Could not load task assignees.')
-    }).finally(() => { if (active) setAssigneeLoading(false) })
-    return () => { active = false }
-  }, [workspaceStatus, workspace.tasks])
 
   useEffect(() => {
     let active = true
@@ -104,8 +81,6 @@ export function TasksPage() {
     <PageHeader eyebrow="DAILY TRACKING" title="Task board" description="Plan, filter, and update your work across projects." actions={<Button variant="primary" icon={<Icon name="plus" />} onClick={() => { setCreateColumn(undefined); setCreateOpen(true) }} disabled={!workspace.projects.length}>Add task</Button>} />
     {workspaceStatus === 'loading' && <LoadingState label="Loading tasks…" />}
     {workspaceStatus === 'error' && <ErrorState title="Could not load tasks" detail="The task list is unavailable. Retry to load current project data." action={<Button onClick={() => void refresh()}>Try again</Button>} />}
-    {assigneeError && <ErrorState title="Could not load task assignees" detail={assigneeError} action={<Button onClick={() => void refresh()}>Refresh tasks</Button>} />}
-    {assigneeLoading && workspaceStatus === 'ready' && <p role="status">Loading task assignees…</p>}
     <div className="page-toolbar task-board-filters" aria-label="Task filters">
       <Input id="task-search" leadingIcon={<Icon name="search" />} placeholder="Search tasks" aria-label="Search tasks" value={query} onChange={(event) => setQuery(event.target.value)} />
       <Select id="task-filter-project" label="Project" value={projectId} onChange={(event) => setProjectId(event.target.value)} options={[{ value: 'all', label: 'All projects' }, ...workspace.projects.map((project) => ({ value: String(project.id), label: project.name }))]} />
@@ -125,7 +100,7 @@ export function TasksPage() {
               <div className="task-card__top"><StatusBadge tone={priorityTone(task.priority)}>{task.priority[0].toUpperCase() + task.priority.slice(1)}</StatusBadge><Button variant="ghost" size="sm" aria-label={`Edit ${task.title}`} onClick={() => setEditTask(task)}>Edit</Button></div>
               <button className="task-card__title" type="button" onClick={() => navigate(taskDetailPath(task.id, '/tasks'))}>{task.title}</button>
               <span className="task-card__project">{project?.name ?? 'Project unavailable'}{task.groupId ? ` · ${groupNames[task.groupId] ?? 'Group unavailable'}` : ''}</span>
-              <div className="task-card__meta"><span>{assigneeNames[task.id] || 'Unassigned'}</span><span>{task.endDate ? formatDate(task.endDate) : 'No due date'}</span></div>
+              <div className="task-card__meta"><TaskAssignees assignees={task.assignees ?? []} /><span>{task.endDate ? formatDate(task.endDate) : 'No due date'}</span></div>
               {(overdue || dueSoon) && <span className={`task-risk${overdue ? ' task-risk--overdue' : ''}`}>{overdue ? 'Overdue' : 'Due soon'}</span>}
               <label className="task-card__move">Move to<Select aria-label={`Move ${task.title} to column`} id={`move-task-${task.id}`} value={taskBoardColumn(task)} onChange={(event) => void changeTaskColumn(task.id, event.target.value as TaskBoardColumn)} options={boardColumns.map(({ id: value, title }) => ({ value, label: title }))} /></label>
             </article>
@@ -141,7 +116,7 @@ export function TasksPage() {
 }
 
 export function TaskDetailPage({ id }: { id: number }) {
-  const { workspace, workspaceStatus, refresh, updateTask, deleteTask } = useDemoWorkspace()
+  const { workspace, workspaceStatus, refresh, updateTask, deleteTask, setTaskAssignees } = useDemoWorkspace()
   const task = workspace.tasks.find((item) => item.id === id)
   const returnPath = taskDetailReturnPath(`${window.location.pathname}${window.location.search}`)
   const returnLabel = /^\/projects\/\d+$/.test(returnPath) ? 'Project detail' : /^\/tasks\/\d+/.test(returnPath) ? 'Previous task' : returnPath === '/timeline' ? 'Timeline' : returnPath === '/dashboard' ? 'Dashboard' : 'Task board'
@@ -197,6 +172,8 @@ export function TaskDetailPage({ id }: { id: number }) {
   async function reloadAssignments() {
     const result = await tasksApi.getAssignees(id)
     setAssignees(result)
+    setTaskAssignees(id, result.map((assignee) => ({ userId: assignee.userId, userName: assignee.userName,
+      avatarUrl: task?.assignees?.find((person) => person.userId === assignee.userId)?.avatarUrl ?? null })))
   }
 
   async function reloadDependencies() {

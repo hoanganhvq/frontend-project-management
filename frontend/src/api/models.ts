@@ -22,7 +22,7 @@ export type TaskRequest = { projectId: number; groupId: number | null; parentTas
 export type TaskUpdateRequest = Omit<TaskRequest, 'projectId' | 'createdById'>
 export type TaskScheduleUpdateRequest = { taskId: number; startDate: string; endDate: string }
 export type TaskScheduleBatchUpdateRequest = { projectId: number; tasks: TaskScheduleUpdateRequest[] }
-export type TaskResponse = { id: number; projectId: number; groupId: number | null; parentTaskId: number | null; parentTaskTitle: string | null; title: string; description: string; startDate: string | null; endDate: string | null; progress: number; priority: TaskPriority; status: TaskStatus; createdById: number; createdByName: string; createdAt: string }
+export type TaskResponse = { assignees?: import('../types/domain').TaskAssigneeSummary[]; id: number; projectId: number; groupId: number | null; parentTaskId: number | null; parentTaskTitle: string | null; title: string; description: string; startDate: string | null; endDate: string | null; progress: number; priority: TaskPriority; status: TaskStatus; createdById: number; createdByName: string; createdAt: string }
 
 export type LoginRequest = { email: string; password: string }
 export type RegisterRequest = { name: string; email: string; password: string }
