@@ -1,4 +1,12 @@
 import { ApiError, apiRequest } from './client'
+import { N8N_SCHEDULE_URL } from '../app/config'
+
+export type ChatResponse = { answer: string; relatedTaskIds: string[]; relatedProjectIds: string[] }
+export const chatApi = {
+  send: (message: string, projectId: number | null, previousQuestions: string[]) => apiRequest<ChatResponse>('/api/chat/messages', {
+    method: 'POST', body: JSON.stringify({ message, projectId, previousQuestions }),
+  }),
+}
 import type { AppNotification, NotificationPageResponse } from './models'
 
 export const notificationsApi = {
@@ -81,7 +89,7 @@ export const aiSchedulesApi = {
   sendChatAction: async (body: N8nScheduleChatRequest) => {
     let response: Response
     try {
-      response = await fetch('/n8n/webhook-test/schedule', {
+      response = await fetch(N8N_SCHEDULE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -115,7 +123,7 @@ export const aiSchedulesApi = {
 
     let response: Response
     try {
-      response = await fetch('http://localhost:5678/webhook-test/schedule', { method: 'POST', body })
+      response = await fetch(N8N_SCHEDULE_URL, { method: 'POST', body })
     } catch {
       throw new ApiError('Could not reach the n8n webhook. Check that n8n is running and retry.', 0)
     }
@@ -146,5 +154,5 @@ export const aiSchedulesApi = {
   savePending: (body: SavePendingScheduleRequest) => apiRequest<SavePendingScheduleResponse>('/api/ai-schedules/pending', { method: 'POST', body: JSON.stringify(body) }),
   approve: (body: ApproveScheduleRequest) => apiRequest<ApproveScheduleResponse>('/api/ai-schedules/approve', { method: 'POST', body: JSON.stringify(body) }),
   reject: (body: RejectScheduleRequest) => apiRequest<RejectScheduleResponse>('/api/ai-schedules/reject', { method: 'POST', body: JSON.stringify(body) }),
-  // The Vite /n8n proxy forwards PDF uploads to localhost:5678 in development.
+  // Relative n8n URLs use Vite's configured /n8n proxy in development.
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../app/AuthProvider'
+import { MAX_SRS_FILE_SIZE_MB } from '../../app/config'
 import { navigate } from '../../app/router'
 import { ApiError } from '../../api/client'
 import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary } from '../../api/models'
@@ -13,7 +14,7 @@ import { Select } from '../../components/ui/Select'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import './AIPlannerPage.css'
 
-const MAX_PDF_BYTES = 10 * 1024 * 1024
+const MAX_PDF_BYTES = MAX_SRS_FILE_SIZE_MB * 1024 * 1024
 
 function isPdf(file: File) {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
@@ -80,7 +81,7 @@ export function AIPlannerPage() {
       return
     }
     if (candidate.size === 0 || candidate.size > MAX_PDF_BYTES) {
-      setError(candidate.size === 0 ? 'The selected PDF is empty.' : 'The PDF must be 10 MB or smaller.')
+      setError(candidate.size === 0 ? 'The selected PDF is empty.' : `The PDF must be ${MAX_SRS_FILE_SIZE_MB} MB or smaller.`)
       return
     }
     setFile(candidate)

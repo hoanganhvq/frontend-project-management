@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AppNotification } from '../api/models'
 import { notificationsApi } from '../api/services'
+import { NOTIFICATION_POLL_INTERVAL_MS } from './config'
 
 type NotificationContextValue = {
   recent: AppNotification[]
@@ -48,7 +49,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     active.current = true
     void refresh()
     const refreshVisible = () => { if (document.visibilityState === 'visible' && !mutating.current) void refresh() }
-    const interval = window.setInterval(refreshVisible, 30_000)
+    const interval = window.setInterval(refreshVisible, NOTIFICATION_POLL_INTERVAL_MS)
     document.addEventListener('visibilitychange', refreshVisible)
     window.addEventListener('focus', refreshVisible)
     return () => {

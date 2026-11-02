@@ -2,6 +2,9 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string
+  readonly VITE_N8N_SCHEDULE_URL?: string
+  readonly VITE_NOTIFICATION_POLL_INTERVAL_MS?: string
+  readonly VITE_MAX_SRS_FILE_SIZE_MB?: string
 }
 
 interface ImportMeta {
