@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { AdminPage } from './features/admin/AdminPage'
 import { AuthProvider, useAuth } from './app/AuthProvider'
 import { NotificationProvider } from './app/NotificationProvider'
 import { DemoWorkspaceProvider } from './app/DemoWorkspaceProvider'
@@ -18,6 +19,7 @@ import { applySettingsPreferences, getDefaultLandingPath, getSettingsPreferences
 import { LocalizedApp } from './app/LocalizedApp'
 
 const pageMeta = {
+  admin: ['Administration', 'Administration'],
   login: ['Sign in', 'Sign in'],
   register: ['Register', 'Register'],
   dashboard: ['Dashboard', 'Dashboard'],
@@ -68,9 +70,14 @@ function RoutedApp() {
       navigate(`/login?redirect=${encodeURIComponent(requested)}`, { replace: true })
       return
     }
+    if (user?.role === 'ADMIN' && route.page !== 'admin' && route.page !== 'login' && route.page !== 'register') {
+      const target = route.page === 'settings' || route.page === 'profile' ? `/admin/${route.page}` : '/admin'
+      navigate(target, { replace: true })
+      return
+    }
     if (user && (route.page === 'login' || route.page === 'register')) {
       const requested = new URLSearchParams(window.location.search).get('redirect')
-      const target = requested?.startsWith('/') && !requested.startsWith('//') ? requested : getDefaultLandingPath()
+      const target = user.role === 'ADMIN' ? '/admin' : requested?.startsWith('/') && !requested.startsWith('//') ? requested : getDefaultLandingPath()
       navigate(target, { replace: true })
     }
   }, [status, user, route.page])
@@ -79,6 +86,9 @@ function RoutedApp() {
   if (status === 'unavailable') return <AuthUnavailablePage message={authError || 'Confirm that the backend is running, then retry.'} onRetry={() => void refresh()} />
   if (!user) return route.page === 'register' ? <RegisterPage /> : <LoginPage />
   if (route.page === 'login' || route.page === 'register') return <AuthLoadingPage message="Opening your workspace…" />
+
+  if (user.role === 'ADMIN' && route.page !== 'admin') return <AuthLoadingPage />
+  if (route.page === 'admin') return <AdminPage section={route.section} key={route.section} />
 
   let page = <DashboardPage />
   if (route.page === 'projects') page = <ProjectsPage openCreate={route.create} />
@@ -104,7 +114,8 @@ export default function App() {
 }
 
 function AuthenticatedApp() {
+  const route = useAppRoute()
   const { user } = useAuth()
-  if (!user) return <RoutedApp />
+  if (!user || route.page === 'admin' || route.page === 'login' || route.page === 'register' || user.role === 'ADMIN') return <RoutedApp />
   return <NotificationProvider key={user.id}><DemoWorkspaceProvider user={user}><RoutedApp /></DemoWorkspaceProvider></NotificationProvider>
 }

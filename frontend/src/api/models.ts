@@ -30,8 +30,6 @@ export type RegisterRequest = { name: string; email: string; password: string }
 export type SavePendingScheduleRequest = { leaderId: number; sessionId: string; scheduleData: Record<string, unknown> }
 export type SavePendingScheduleResponse = { scheduleId: number }
 export type UpdatePendingScheduleRequest = { scheduleData: Record<string, unknown> }
-export type N8nScheduleChatRequest = { action: 'chat'; message: string; leaderId: number; scheduleId: number }
-export type N8nScheduleChatResponse = { success?: boolean; action?: string; message?: string; [key: string]: unknown }
 export type AiScheduleMember = { id: number; name: string; position: string | null }
 export type AiScheduleTaskPreview = { title: string; description?: string; priority?: string; startDate?: string; endDate?: string; parentTitle?: string | null; groupTempId?: string; assigneeIds?: number[]; dependsOnTitles?: string[] }
 export type AiScheduleResponse = {
@@ -66,3 +64,5 @@ export type AppNotification = {
   readAt: string | null
 }
 export type NotificationPageResponse = { content: AppNotification[]; totalElements: number; totalPages: number; page: number; size: number; unreadCount: number }
+
+export type AiGenerationJob = { id: string; requesterId: number; requesterName: string; filename: string; assignmentMode: string; status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'UNKNOWN'; createdAt: string; startedAt: string | null; finishedAt: string | null; durationMs: number | null; scheduleId: number | null; errorCode: string | null; message: string | null }

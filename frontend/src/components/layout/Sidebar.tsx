@@ -60,6 +60,7 @@ export function Sidebar({ activePage, collapsed, mobileOpen, sidebarRef, onKeyDo
     <nav className="sidebar__nav" aria-label="Main navigation">
       <p className="nav-label">Workspace</p>{workspaceLinks.map(renderLink)}
       <p className="nav-label nav-label--spaced">Current project</p>{projectLinks.map(renderLink)}
+      {user?.role === 'ADMIN' && <><p className="nav-label nav-label--spaced">System</p><button type="button" className="nav-link" aria-label="Quản trị hệ thống" title="Quản trị hệ thống" onClick={() => navigate('/admin')}><Icon name="shield" /><span>Quản trị hệ thống</span></button></>}
     </nav>
     <div className="sidebar__bottom">
       <button className="profile-button" type="button" onClick={() => onNavigate('Profile')} aria-label={`Open profile for ${userName}`}><span className="profile-avatar">{userInitials}</span><span className="profile-button__copy"><strong>{userName}</strong><small>{userPosition}</small></span><Icon name="dots" /></button>
