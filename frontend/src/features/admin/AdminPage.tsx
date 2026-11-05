@@ -35,9 +35,9 @@ export function AdminPage({ section }: { section: AdminSection }) {
       <div className="admin-brand"><span><Icon name="shield" /></span><div><strong>{APP_SHORT_NAME}</strong><small>Quản trị hệ thống</small></div></div>
       <p className="admin-nav-label">QUẢN TRỊ</p>
       <nav aria-label="Quản trị hệ thống">{sections.map(item => <button key={item.id} type="button" aria-current={section === item.id ? 'page' : undefined} onClick={() => navigate(item.path)}><Icon name={item.icon} />{item.name}</button>)}</nav>
-      <div className="admin-sidebar-bottom"><span>ADMIN · {user.name}</span></div>
+      <div className="admin-sidebar-bottom"><span>ADMIN · {user.name}</span><button className="sign-out-button" type="button" onClick={() => void logout()}><Icon name="logout" /><span>Đăng xuất</span></button></div>
     </aside>
-    <div className="admin-body"><header className="admin-topbar"><span>Hệ thống / <strong>{sections.find(item => item.id === section)?.name}</strong></span><Button size="sm" variant="ghost" onClick={() => void logout()}>Đăng xuất</Button></header>
+    <div className="admin-body"><header className="admin-topbar"><span>Hệ thống / <strong>{sections.find(item => item.id === section)?.name}</strong></span></header>
       <main id="admin-main" className="admin-content">{section === 'settings' ? <SettingsPage /> : section === 'profile' ? <ProfilePage /> : section === 'overview' ? <Overview /> : section === 'users' ? <Users /> : section === 'projects' ? <Projects /> : <AdminReports kind={section === 'audit-logs' ? 'audit' : 'jobs'} />}</main>
     </div>
   </div>
