@@ -54,6 +54,9 @@ export const groupMembersApi = {
 }
 
 export const usersApi = {
+  skillCatalog: () => apiRequest<Array<{ id: number; name: string; category: string | null }>>('/api/skills', { cache: 'no-store' }),
+  mySkills: () => apiRequest<import('./models').MemberSkill[]>('/api/users/me/skills', { cache: 'no-store' }),
+  saveMySkills: (skills: Array<{ skillId: number; level: string }>) => apiRequest<import('./models').MemberSkill[]>('/api/users/me/skills', { method: 'PUT', body: JSON.stringify({ skills }) }),
   search: (keyword: string) => apiRequest<UserResponse[]>(`/api/users/search?keyword=${encodeURIComponent(keyword)}`),
   update: (id: number, body: UserUpdateRequest) => apiRequest<UserResponse>(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   uploadAvatar: (id: number, file: File) => {
