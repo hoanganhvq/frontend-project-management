@@ -1,5 +1,4 @@
-import { ApiError, apiRequest } from './client'
-import { N8N_SCHEDULE_URL } from '../app/config'
+import { apiRequest } from './client'
 
 export type ChatResponse = { answer: string; relatedTaskIds: string[]; relatedProjectIds: string[] }
 export const chatApi = {
@@ -14,7 +13,7 @@ export const notificationsApi = {
   markRead: (id: number) => apiRequest<AppNotification>(`/api/notifications/${id}/read`, { method: 'PATCH' }),
   markAllRead: () => apiRequest<void>('/api/notifications/read-all', { method: 'PATCH' }),
 }
-import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary, ApproveScheduleRequest, ApproveScheduleResponse, GenerateAiScheduleResponse, GroupMember, LoginRequest, N8nScheduleChatRequest, N8nScheduleChatResponse, ProjectGroup, ProjectGroupRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskAssignee, TaskDependency, TaskRequest, TaskResponse, TaskScheduleBatchUpdateRequest, TaskUpdateRequest, UpdatePendingScheduleRequest, UserResponse, UserUpdateRequest } from './models'
+import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary, ApproveScheduleRequest, ApproveScheduleResponse, GenerateAiScheduleResponse, GroupMember, LoginRequest, ProjectGroup, ProjectGroupRequest, ProjectMember, ProjectMemberCandidate, ProjectMemberMutation, ProjectMemberProject, ProjectMemberRoleUpdate, ProjectRequest, ProjectResponse, ProjectUpdateRequest, RegisterRequest, RejectScheduleRequest, RejectScheduleResponse, SavePendingScheduleRequest, SavePendingScheduleResponse, TaskAssignee, TaskDependency, TaskRequest, TaskResponse, TaskScheduleBatchUpdateRequest, TaskUpdateRequest, UpdatePendingScheduleRequest, UserResponse, UserUpdateRequest } from './models'
 
 export const authApi = {
   login: (body: LoginRequest) => apiRequest<string>('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
@@ -55,6 +54,9 @@ export const groupMembersApi = {
 }
 
 export const usersApi = {
+  skillCatalog: () => apiRequest<Array<{ id: number; name: string; category: string | null }>>('/api/skills', { cache: 'no-store' }),
+  mySkills: () => apiRequest<import('./models').MemberSkill[]>('/api/users/me/skills', { cache: 'no-store' }),
+  saveMySkills: (skills: Array<{ skillId: number; level: string }>) => apiRequest<import('./models').MemberSkill[]>('/api/users/me/skills', { method: 'PUT', body: JSON.stringify({ skills }) }),
   search: (keyword: string) => apiRequest<UserResponse[]>(`/api/users/search?keyword=${encodeURIComponent(keyword)}`),
   update: (id: number, body: UserUpdateRequest) => apiRequest<UserResponse>(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   uploadAvatar: (id: number, file: File) => {
@@ -86,73 +88,22 @@ export const aiSchedulesApi = {
   getPendingById: (scheduleId: number) => apiRequest<AiScheduleResponse>(`/api/ai-schedules/${scheduleId}`),
   updatePending: (scheduleId: number, body: UpdatePendingScheduleRequest) => apiRequest<SavePendingScheduleResponse>(`/api/ai-schedules/${scheduleId}`, { method: 'PUT', body: JSON.stringify(body) }),
   getAssignableMembers: (keyword = '') => apiRequest<AiScheduleMember[]>(`/api/ai-schedules/members?keyword=${encodeURIComponent(keyword)}`),
-  sendChatAction: async (body: N8nScheduleChatRequest) => {
-    let response: Response
-    try {
-      response = await fetch(N8N_SCHEDULE_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-    } catch {
-      throw new ApiError('Could not reach the n8n webhook. Check that n8n is running and retry.', 0)
-    }
-
-    const responseText = await response.text()
-    let payload: unknown
-    try {
-      payload = JSON.parse(responseText)
-    } catch {
-      if (!response.ok) throw new ApiError(`The n8n webhook request failed (${response.status}).`, response.status)
-      if (!responseText.trim()) return { message: 'The request was sent to n8n.' }
-      throw new ApiError('The n8n webhook returned invalid JSON.', response.status)
-    }
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      throw new ApiError('The n8n webhook returned an unexpected response.', response.status)
-    }
-    const result = payload as N8nScheduleChatResponse
-    if (!response.ok) throw new ApiError(result.message || `The n8n webhook request failed (${response.status}).`, response.status)
-    if (result.success === false) throw new ApiError(result.message || 'n8n could not process this schedule action.', response.status)
-    return result
-  },
-  generateFromPdf: async (file: File, leaderId: number, assignmentMode?: 'AUTO') => {
+  generateFromPdf: async (file: File, _leaderId: number, assignmentMode?: 'AUTO', signal?: AbortSignal): Promise<GenerateAiScheduleResponse> => {
     const body = new FormData()
     body.set('file', file)
-    body.set('leaderId', String(leaderId))
     if (assignmentMode === 'AUTO') body.set('assignmentMode', assignmentMode)
-
-    let response: Response
-    try {
-      response = await fetch(N8N_SCHEDULE_URL, { method: 'POST', body })
-    } catch {
-      throw new ApiError('Could not reach the n8n webhook. Check that n8n is running and retry.', 0)
+    type Job = import('./models').AiGenerationJob
+    let job = await apiRequest<Job>('/api/ai-jobs', { method: 'POST', body, signal })
+    const deadline = Date.now() + 90 * 60 * 1000
+    while (job.status === 'QUEUED' || job.status === 'RUNNING') {
+      if (Date.now() > deadline) throw new Error(`Tracking timed out for job ${job.id}. Check pending drafts before submitting again.`)
+      await new Promise(resolve => window.setTimeout(resolve, 3000))
+      job = await apiRequest<Job>(`/api/ai-jobs/${job.id}`, { cache: 'no-store', signal })
     }
-
-    const responseText = await response.text()
-    let payload: unknown
-    try {
-      payload = JSON.parse(responseText)
-    } catch {
-      const message = response.status === 404
-        ? 'n8n returned 404. Start the webhook test listener in n8n, then submit the PDF again.'
-        : response.ok ? 'The n8n webhook returned invalid JSON.' : `The n8n webhook request failed (${response.status}).`
-      throw new ApiError(message, response.status)
-    }
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      throw new ApiError('The n8n webhook returned an unexpected response.', response.status)
-    }
-
-    const result = payload as GenerateAiScheduleResponse
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new ApiError('n8n returned 404. Start the webhook test listener in n8n, then submit the PDF again.', response.status)
-      }
-      throw new ApiError(result.message || `The n8n webhook request failed (${response.status}).`, response.status)
-    }
-    return result
+    if (job.status !== 'SUCCEEDED' || !job.scheduleId) throw new Error(`${job.message || 'The workflow did not confirm a saved draft.'} (Job: ${job.id})`)
+    return { success: true, action: 'pending', scheduleId: job.scheduleId, message: job.message ?? undefined }
   },
   savePending: (body: SavePendingScheduleRequest) => apiRequest<SavePendingScheduleResponse>('/api/ai-schedules/pending', { method: 'POST', body: JSON.stringify(body) }),
   approve: (body: ApproveScheduleRequest) => apiRequest<ApproveScheduleResponse>('/api/ai-schedules/approve', { method: 'POST', body: JSON.stringify(body) }),
   reject: (body: RejectScheduleRequest) => apiRequest<RejectScheduleResponse>('/api/ai-schedules/reject', { method: 'POST', body: JSON.stringify(body) }),
-  // Relative n8n URLs use Vite's configured /n8n proxy in development.
 }

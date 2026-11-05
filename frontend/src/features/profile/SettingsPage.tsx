@@ -184,7 +184,7 @@ export function SettingsPage() {
               <OptionRow title={t('email')} description={user.email} controlId="settings-email"><Input id="settings-email" value={user.email} readOnly /></OptionRow>
             </div>
             <div className="settings-panel-heading settings-panel-heading--sub"><span className="settings-panel-heading__icon"><Icon name="grid" /></span><div><h2>{t('personalPreferences')}</h2><p>{t('personalPreferencesHelp')}</p></div></div>
-            <div className="settings-options"><OptionRow title={t('defaultLanding')} description={t('defaultLandingHelp')} controlId="settings-start-page"><Select id="settings-start-page" aria-label={t('defaultLanding')} value={landingPage} onChange={(event) => setLandingPage(event.target.value as SettingsStartPage)} options={startPageOptions} /></OptionRow></div>
+            {user.role !== 'ADMIN' && <div className="settings-options"><OptionRow title={t('defaultLanding')} description={t('defaultLandingHelp')} controlId="settings-start-page"><Select id="settings-start-page" aria-label={t('defaultLanding')} value={landingPage} onChange={(event) => setLandingPage(event.target.value as SettingsStartPage)} options={startPageOptions} /></OptionRow></div>}
             {profileError && <p className="team-members-feedback team-members-feedback--error" role="alert">{profileError}</p>}
             {profileNotice && <p className="team-members-feedback team-members-feedback--success" role="status">{profileNotice}</p>}
             <div className="settings-form-actions"><Button variant="primary" type="submit" disabled={profileBusy || !dirtyProfile}>{profileBusy ? t('savingChanges') : t('saveChanges')}</Button></div>
@@ -239,7 +239,7 @@ export function SettingsPage() {
         {activeTab === 'about' && <>
           <div className="settings-panel-heading"><span className="settings-panel-heading__icon"><Icon name="inbox" /></span><div><h2>{APP_NAME}</h2><p>{t('aboutHelp')}</p></div></div>
           <dl className="settings-about-details"><div><dt>{t('version')}</dt><dd>{APP_VERSION}</dd></div><div><dt>{t('language')}</dt><dd>{t(preferences.language === 'vi' ? 'vietnamese' : preferences.language === 'ja' ? 'japanese' : 'english')}</dd></div></dl>
-          <div className="settings-support-card"><div><h3>{t('support')}</h3><p>{t('supportHelp')}</p></div><div><Button variant="secondary" onClick={() => navigate('/profile')}>{t('profileTitle')}</Button><Button variant="primary" onClick={() => void copySupportDetails()}>{t('copySupport')}</Button></div></div>
+          <div className="settings-support-card"><div><h3>{t('support')}</h3><p>{t('supportHelp')}</p></div><div><Button variant="secondary" onClick={() => navigate(user.role === 'ADMIN' ? '/admin/profile' : '/profile')}>{t('profileTitle')}</Button><Button variant="primary" onClick={() => void copySupportDetails()}>{t('copySupport')}</Button></div></div>
           {supportNotice && <p className="settings-inline-notice" role="status">{supportNotice}</p>}
           <div className="settings-reset-row"><span>{t('restoreDefaultsHelp')}</span><Button variant="ghost" onClick={() => { setPreferences(defaultSettings); setLandingPage(defaultSettings.startPage); saveSettingsPreferences(defaultSettings); void i18n.changeLanguage(defaultSettings.language); setHasSaved(true); setSupportNotice(t('defaultsRestored')) }}>{t('restoreDefaults')}</Button></div>
         </>}

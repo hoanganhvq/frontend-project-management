@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
 export type AppRoute =
+  | { page: 'admin'; section: 'overview' | 'users' | 'projects' | 'audit-logs' | 'ai-jobs' | 'settings' | 'profile' }
   | { page: 'login' }
   | { page: 'register' }
   | { page: 'dashboard' }
@@ -35,6 +36,13 @@ function currentPath() {
 
 export function parseRoute(path: string): AppRoute {
   const [pathname, search = ''] = path.split('?')
+  if (pathname === '/admin' || pathname === '/admin/') return { page: 'admin', section: 'overview' }
+  if (pathname === '/admin/audit-logs') return { page: 'admin', section: 'audit-logs' }
+  if (pathname === '/admin/ai-jobs') return { page: 'admin', section: 'ai-jobs' }
+  if (pathname === '/admin/settings') return { page: 'admin', section: 'settings' }
+  if (pathname === '/admin/profile') return { page: 'admin', section: 'profile' }
+  if (pathname === '/admin/users') return { page: 'admin', section: 'users' }
+  if (pathname === '/admin/projects') return { page: 'admin', section: 'projects' }
   if (pathname === '/login') return { page: 'login' }
   if (pathname === '/register') return { page: 'register' }
   if (pathname === '/' || pathname === '/dashboard') return { page: 'dashboard' }

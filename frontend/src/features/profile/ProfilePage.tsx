@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/Input'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import './AccountPages.css'
+import { MySkills } from './MySkills'
 
 export function ProfilePage() {
   const { user, updateCurrentUser } = useAuth()
@@ -81,5 +82,6 @@ export function ProfilePage() {
       </form>}
       {!editing && <p className="profile-card__note">Your name, email, position, and profile photo can be updated on the server. System role and password are not editable here.</p>}
     </section>
+    <MySkills key={userId} />
   </div>
 }

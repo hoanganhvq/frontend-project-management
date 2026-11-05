@@ -42,6 +42,8 @@ export function AIPlannerPage() {
   const [lastDecision, setLastDecision] = useState<'Approve' | 'Reject' | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+  const generationAbort = useRef<AbortController | null>(null)
+  useEffect(() => () => generationAbort.current?.abort(), [])
 
   async function refreshPendingDrafts() {
     setLoadingDrafts(true)
@@ -155,7 +157,8 @@ export function AIPlannerPage() {
     setActionMessage('')
     setScheduleId(null)
     try {
-      const result = await aiSchedulesApi.generateFromPdf(file, user.id, autoAssignTasks ? 'AUTO' : undefined)
+      generationAbort.current = new AbortController()
+      const result = await aiSchedulesApi.generateFromPdf(file, user.id, autoAssignTasks ? 'AUTO' : undefined, generationAbort.current.signal)
       if (result?.success !== true || result.action !== 'pending') {
         throw new Error(result?.message || 'n8n did not confirm that the schedule was saved. You can retry this upload.')
       }
@@ -163,8 +166,10 @@ export function AIPlannerPage() {
       setActionMessage(result.message || 'The generated schedule was saved for review.')
       setSchedule(null)
       setStep('review')
-      await loadLatestPendingSchedule()
+      if (result.scheduleId) await openPendingDraft(result.scheduleId)
+      else await loadLatestPendingSchedule()
     } catch (requestError) {
+      if (generationAbort.current?.signal.aborted) return
       setError(requestError instanceof ApiError
         ? requestError.message
         : requestError instanceof Error
@@ -269,6 +274,7 @@ export function AIPlannerPage() {
       void refreshPendingDrafts()
       setActionMessage(confirmationMessage)
     } catch (requestError) {
+      if (generationAbort.current?.signal.aborted) return
       setError(requestError instanceof ApiError ? requestError.message : 'Could not save this draft. Please retry.')
     } finally {
       setWorking('idle')
@@ -299,6 +305,7 @@ export function AIPlannerPage() {
       setPendingDrafts((current) => current.filter((draft) => draft.id !== schedule.id))
       setStep('complete')
     } catch (requestError) {
+      if (generationAbort.current?.signal.aborted) return
       setError(requestError instanceof ApiError ? requestError.message : `Could not send the ${decision.toLowerCase()} request. Please review the fields and retry.`)
     } finally {
       setWorking('idle')
