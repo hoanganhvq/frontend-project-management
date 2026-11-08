@@ -1,4 +1,5 @@
 import type { Link as GanttLink, Task as GanttTask } from 'dhtmlx-gantt'
+import { taskPhaseLabel } from '../../types/domain'
 import type { ProjectMilestone, Task } from '../../types/domain'
 
 export type MappedGanttData = {
@@ -60,7 +61,7 @@ export function mapTasksToGantt(tasks: Task[], milestones: ProjectMilestone[] = 
 
   const ganttTasks: GanttTask[] = [...scheduled.values()].map((task) => ({
     id: task.id,
-    text: task.title,
+    text: task.phase ? `${task.title} · ${taskPhaseLabel(task.phase)}` : task.title,
     owner: task.assigneeName || 'Unassigned',
     start_date: task.ganttStart,
     end_date: task.ganttEnd,

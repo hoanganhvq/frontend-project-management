@@ -1,6 +1,11 @@
 export type ProjectStatus = 'in_progress' | 'completed' | 'cancelled'
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'canceled'
 export type TaskPriority = 'low' | 'medium' | 'high'
+export const TASK_PHASES = ['REQUIREMENTS_REVIEW', 'DESIGN', 'IMPLEMENTATION', 'TESTING', 'DEPLOYMENT'] as const
+export type TaskPhase = typeof TASK_PHASES[number]
+export function taskPhaseLabel(phase?: TaskPhase | null): string {
+  return phase ? ({ REQUIREMENTS_REVIEW: 'Requirements review', DESIGN: 'Design', IMPLEMENTATION: 'Implementation', TESTING: 'Testing', DEPLOYMENT: 'Deployment' })[phase] : 'No phase'
+}
 export type TaskBoardColumn = 'todo' | 'in_progress' | 'review' | 'done'
 
 export type Project = {
@@ -16,6 +21,9 @@ export type Project = {
 export type TaskAssigneeSummary = { userId: number; userName: string; avatarUrl: string | null }
 
 export type Task = {
+  phase?: TaskPhase | null
+  deliverable?: string | null
+  requirementIds?: string[]
   assignees?: TaskAssigneeSummary[]
   id: number
   projectId: number

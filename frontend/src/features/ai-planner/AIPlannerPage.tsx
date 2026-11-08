@@ -3,7 +3,7 @@ import { useAuth } from '../../app/AuthProvider'
 import { MAX_SRS_FILE_SIZE_MB } from '../../app/config'
 import { navigate } from '../../app/router'
 import { ApiError } from '../../api/client'
-import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary } from '../../api/models'
+import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary, ScheduleValidationReport } from '../../api/models'
 import { aiSchedulesApi } from '../../api/services'
 import { Button } from '../../components/ui/Button'
 import { ErrorState } from '../../components/ui/States'
@@ -12,7 +12,16 @@ import { Input } from '../../components/ui/Input'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Select } from '../../components/ui/Select'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { TASK_PHASES, taskPhaseLabel, type TaskPhase } from '../../types/domain'
+import { planSimpleWaterfall } from './simpleWaterfall.js'
 import './AIPlannerPage.css'
+
+function durationDays(start?: string, end?: string) {
+  if (!start || !end) return null
+  const days = (Date.parse(end + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86400000 + 1
+  return Number.isInteger(days) && days > 0 ? days : null
+}
+
 
 const MAX_PDF_BYTES = MAX_SRS_FILE_SIZE_MB * 1024 * 1024
 
@@ -26,10 +35,13 @@ export function AIPlannerPage() {
   const [file, setFile] = useState<File | null>(null)
   const [autoAssignTasks, setAutoAssignTasks] = useState(false)
   const [error, setError] = useState('')
+  const reviewErrorRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (error) reviewErrorRef.current?.focus() }, [error])
   const [scheduleId, setScheduleId] = useState<number | null>(null)
   const [schedule, setSchedule] = useState<AiScheduleResponse | null>(null)
   const [draftData, setDraftData] = useState<AiScheduleResponse['scheduleData'] | null>(null)
   const [members, setMembers] = useState<AiScheduleMember[]>([])
+  const [taskFilter, setTaskFilter] = useState('ALL')
   const [memberSearch, setMemberSearch] = useState('')
   const [memberError, setMemberError] = useState('')
   const [loadingMembers, setLoadingMembers] = useState(false)
@@ -185,7 +197,38 @@ export function AIPlannerPage() {
   const scheduleData = draftData
   const groups = scheduleData?.newGroups ?? []
   const tasks = scheduleData?.tasks ?? []
+  const waterfall = scheduleData?.planningModel === 'WATERFALL'
+  const parentTitles = new Set(tasks.map(task => task.parentTitle).filter(Boolean))
+  const executableTasks = tasks.filter(task => !parentTitles.has(task.title))
   const hasUnsavedChanges = !!schedule && !!draftData && JSON.stringify(schedule.scheduleData) !== JSON.stringify(draftData)
+  const validation = schedule?.validation
+
+  function focusIssue(path: string) {
+    setTaskFilter('ALL')
+    requestAnimationFrame(() => {
+    const parts = path.split('/')
+    const taskFields: Record<string, string> = { startDate: 'start', endDate: 'end', groupTempId: 'group', parentTitle: 'parent', dependsOnTitles: 'dependencies', requirementIds: 'requirements' }
+    const id = parts[1] === 'tasks' && parts[2] ? `ai-task-${taskFields[parts[3]] ?? parts[3]}-${parts[2]}`
+      : parts[1] === 'project' ? `ai-project-${parts[2] === 'startDate' ? 'start' : parts[2] === 'endDate' ? 'end' : parts[2]}` : null
+    const element = id ? document.getElementById(id) : document.getElementById('tasks-heading')
+    const details = element?.closest('details')
+    if (details) details.open = true
+    element?.scrollIntoView({ block: 'center' })
+    element?.focus()
+    })
+  }
+
+  function addTask() {
+    let number = tasks.length + 1
+    while (tasks.some(task => task.title === `New task ${number}`)) number++
+    setDraftData(current => current ? { ...current, tasks: [...(current.tasks ?? []), { title: `New task ${number}`, description: '', deliverable: '', phase: null, parentTitle: null, groupTempId: groups[0]?.tempId, assigneeIds: [], dependsOnTitles: [], requirementIds: [], startDate: current.project?.startDate, endDate: current.project?.startDate }] } : current)
+  }
+
+  function addGroup() {
+    let number = groups.length + 1
+    while (groups.some(group => group.tempId === `group-${number}`)) number++
+    setDraftData(current => current ? { ...current, newGroups: [...(current.newGroups ?? []), { tempId: `group-${number}`, name: `New group ${number}`, memberIds: [] }] } : current)
+  }
 
   function returnToDraftList() {
     if (hasUnsavedChanges && !window.confirm('You have unsaved edits. Return to the draft list and discard these edits?')) return
@@ -238,6 +281,11 @@ export function AIPlannerPage() {
   function toggleGroupMember(groupIndex: number, memberId: number) {
     setActionMessage('')
     const currentIds = groups[groupIndex]?.memberIds ?? []
+    const affected = currentIds.includes(memberId) ? tasks.filter(task => task.groupTempId === groups[groupIndex].tempId && task.assigneeIds?.includes(memberId)) : []
+    if (affected.length) {
+      if (!window.confirm(`Remove this member from the group and unassign them from ${affected.length} task(s) in this group? Other task assignees will be kept.`)) return
+      setDraftData(current => current ? { ...current, tasks: (current.tasks ?? []).map(task => task.groupTempId === groups[groupIndex].tempId ? { ...task, assigneeIds: task.assigneeIds?.filter(id => id !== memberId) } : task) } : current)
+    }
     patchGroup(groupIndex, { memberIds: currentIds.includes(memberId) ? currentIds.filter((id) => id !== memberId) : [...currentIds, memberId] })
   }
 
@@ -260,7 +308,7 @@ export function AIPlannerPage() {
     setActionMessage('')
     try {
       await aiSchedulesApi.updatePending(schedule.id, { scheduleData: draftData })
-      const locallySavedSchedule = { ...schedule, scheduleData: draftData }
+      const locallySavedSchedule = { ...schedule, scheduleData: draftData, validation: null }
       setSchedule(locallySavedSchedule)
 
       let confirmationMessage = 'Draft saved to your account.'
@@ -295,8 +343,16 @@ export function AIPlannerPage() {
     setError('')
     setActionMessage('')
     try {
-      await aiSchedulesApi.updatePending(schedule.id, { scheduleData: draftData })
-      setSchedule({ ...schedule, scheduleData: draftData })
+      if (decision === 'Approve') {
+        await aiSchedulesApi.updatePending(schedule.id, { scheduleData: draftData })
+        const fresh = await aiSchedulesApi.getPendingById(schedule.id)
+        setSchedule(fresh)
+        setDraftData(JSON.parse(JSON.stringify(fresh.scheduleData)))
+        if (fresh.validation?.validationState === 'NEEDS_REVIEW') {
+          setError('Draft saved. Resolve the validation issues below before approving.')
+          return
+        }
+      }
       const result = decision === 'Approve'
         ? await aiSchedulesApi.approve({ scheduleId: schedule.id, leaderId: user.id })
         : await aiSchedulesApi.reject({ scheduleId: schedule.id, reason: 'Rejected from AI Planner' })
@@ -306,6 +362,10 @@ export function AIPlannerPage() {
       setStep('complete')
     } catch (requestError) {
       if (generationAbort.current?.signal.aborted) return
+      if (requestError instanceof ApiError && requestError.status === 422) {
+        const details = requestError.details as { validation?: ScheduleValidationReport } | undefined
+        if (details?.validation) setSchedule(current => current ? { ...current, validation: details.validation } : current)
+      }
       setError(requestError instanceof ApiError ? requestError.message : `Could not send the ${decision.toLowerCase()} request. Please review the fields and retry.`)
     } finally {
       setWorking('idle')
@@ -415,10 +475,16 @@ export function AIPlannerPage() {
           <span className="planner-review-intro__counts">{tasks.length} tasks <span aria-hidden="true">·</span> {groups.length} groups</span>
         </div>
         {loadingSchedule && <p className="planner-pending-loading" role="status">Loading saved schedule and team members…</p>}
-        {error && <div className="planner-schedule-load-error" role="alert"><p>{error}</p>{!schedule && <Button variant="secondary" disabled={loadingSchedule} onClick={() => void loadLatestPendingSchedule()}>Retry loading</Button>}</div>}
+        {error && <div className="planner-schedule-load-error" role="alert" ref={reviewErrorRef} tabIndex={-1}><p>{error}</p>{!schedule && <Button variant="secondary" disabled={loadingSchedule} onClick={() => void loadLatestPendingSchedule()}>Retry loading</Button>}</div>}
         {actionMessage && <p className="team-members-feedback team-members-feedback--success" role="status"><strong>{actionMessage}</strong></p>}
 
         {schedule && scheduleData && <>
+          {typeof scheduleData.aiNote === 'string' && !!scheduleData.aiNote.trim() && <details className="planner-edit-section"><summary>Planning assumptions</summary><p>{scheduleData.aiNote}</p></details>}
+          {waterfall && <section className="planner-edit-section planner-validation" aria-label="Draft validation" aria-live="polite">
+            <h3>{hasUnsavedChanges ? 'Edits need validation' : validation?.validationState === 'READY' ? 'Ready for approval review' : 'Draft needs review'}</h3>
+            <p>{hasUnsavedChanges ? 'Save your edits to refresh the server validation report.' : validation?.validationState === 'READY' ? 'Structural checks passed. Review source meaning and estimates before approving.' : 'You can edit and save this draft. Resolve blocking issues before approval.'}</p>
+            {!!validation?.issues.length && <details open><summary>{validation.issues.filter(issue => issue.blocksApproval).length} blocking issues{hasUnsavedChanges ? ' in the last saved version' : ''}</summary><ul>{validation.issues.map((issue, index) => <li key={`${issue.code}-${index}`}><button type="button" className="planner-issue-link" onClick={() => focusIssue(issue.path)}>{issue.taskTitle ? `${issue.taskTitle}: ` : ''}{issue.message}</button>{!!issue.requirementIds?.length && <p>{issue.requirementIds.join(', ')}</p>}</li>)}</ul></details>}
+          </section>}
           <section className="planner-edit-section" aria-labelledby="project-fields-heading">
             <div className="planner-edit-section__heading"><div><h3 id="project-fields-heading">Project details</h3><p>These fields become the new project when you approve.</p></div><span className="planner-edit-section__step">01</span></div>
             <div className="planner-edit-grid">
@@ -437,6 +503,8 @@ export function AIPlannerPage() {
           </section>
 
           <section className="planner-edit-section" aria-labelledby="groups-heading">
+            {!!scheduleData.assignmentAdjustments?.length && <details className="planner-edit-section"><summary>Assignment consistency ({scheduleData.assignmentAdjustments.length})</summary><p>Verified task assignees were included in their AI-generated groups. The proposed task assignments were kept.</p><ul>{scheduleData.assignmentAdjustments.map((change, index) => <li key={`${change.taskTitle}-${index}`}>{change.taskTitle}: {change.addedMemberIds.map(id => members.find(member => member.id === id)?.name || `Member #${id}`).join(', ')} added to {groups.find(group => group.tempId === change.groupTempId)?.name || change.groupTempId}.</li>)}</ul></details>}
+            <Button variant="secondary" size="sm" disabled={working !== 'idle'} onClick={addGroup}>Add group</Button>
             <div className="planner-edit-section__heading"><div><h3 id="groups-heading">Groups & members</h3><p>Choose who belongs to each project group.</p></div><span className="planner-edit-section__step">03</span></div>
             <div className="planner-edit-stack">
               {groups.map((group, groupIndex) => {
@@ -452,26 +520,56 @@ export function AIPlannerPage() {
             </div>
           </section>
 
+          {waterfall && <section className="planner-edit-section" aria-label="Waterfall phases">
+            <h3>Waterfall plan</h3>
+            <p>{TASK_PHASES.map(phase => `${taskPhaseLabel(phase)}: ${executableTasks.filter(task => task.phase === phase).length}`).join(' · ')}</p>
+            <p>Review scope, outputs and estimates. Phases run in order; independent work can overlap within a phase. Unassigned plans need staffing review.</p>
+                    </section>}
+
+          {waterfall && !!scheduleData.sourceRequirements?.length && <details className="planner-edit-section"><summary>SRS reference ({scheduleData.sourceRequirements.length})</summary><p>Optional SRS reference. Review scope by feature; no requirement-ID selection is needed.</p><ul>{scheduleData.sourceRequirements.map(source => <li key={source.sourceRequirementId}><strong>{source.title || source.sourceRequirementId}</strong><p>{source.description}</p></li>)}</ul></details>}
+
+          {waterfall && scheduleData.planningDiagnostics?.reviewRequired && <details className="planner-edit-section planner-review-notes" aria-label="Schedule review notes"><summary>Planning history</summary>
+            <h3>Schedule review notes</h3>
+            <p>{scheduleData.planningDiagnostics.repairAttempts} AI repair passes · {scheduleData.planningDiagnostics.dateAdjustments?.length} date adjustments</p>
+            <p>Optional history of earlier planning adjustments. Review the current scope and task estimates before approving.</p>
+            {scheduleData.planningDiagnostics.dateAdjustments?.some(change => change.taskTitle === null) && <p role="status">The project date estimate changed. Review the project dates above.</p>}
+            {!!scheduleData.planningDiagnostics.dateAdjustments?.length && <details>
+              <summary>View date adjustments</summary>
+              <ul>{scheduleData.planningDiagnostics.dateAdjustments?.map((change, index) => <li key={`${change.taskTitle}-${index}`}><strong>{change.taskTitle ?? 'Project dates'}</strong><span>{change.startDate || 'No start'} → {change.endDate || 'No end'}; revised to {change.newStartDate} → {change.newEndDate}.</span><small>{change.reason === 'SUMMARY_ROLLUP' ? 'Parent dates now cover child tasks.' : change.reason === 'PROJECT_END_ESTIMATE' ? 'Project estimate includes the revised schedule.' : change.reason === 'PROJECT_START_BASELINE' ? 'Start date follows the planning baseline.' : 'Dates follow phase and prerequisite order; task duration is preserved.'}</small></li>)}</ul>
+            </details>}
+            {!!scheduleData.planningDiagnostics.semanticChanges?.length && <details>
+              <summary>View task repairs</summary>
+              <ul>{scheduleData.planningDiagnostics.semanticChanges?.map((change, index) => <li key={`${change.taskTitle}-${index}`}><strong>{change.taskTitle}</strong><span>{change.reason}</span></li>)}</ul>
+            </details>}
+          </details>}
+
           <section className="planner-edit-section" aria-labelledby="tasks-heading">
-            <div className="planner-edit-section__heading"><div><h3 id="tasks-heading">Tasks & assignments</h3><p>Adjust dates, priority, group and owners for each task.</p></div><span className="planner-edit-section__step">04</span></div>
+            <div className="planner-edit-section__heading"><div><Button variant="secondary" size="sm" disabled={working !== 'idle'} onClick={addTask}>Add task</Button><h3 id="tasks-heading" tabIndex={-1}>Tasks & assignments</h3><p>Adjust dates, priority, group and owners for each task.</p></div><span className="planner-edit-section__step">04</span></div>
+            <div className="planner-task-controls"><Select id="ai-task-filter" label="View phase" value={taskFilter} onChange={event => setTaskFilter(event.target.value)} options={[{ value: 'ALL', label: 'All phases' }, ...TASK_PHASES.map(phase => ({ value: phase, label: taskPhaseLabel(phase) }))]} />{scheduleData.planningPolicy === 'WATERFALL_SIMPLE_V1' && <Button variant="secondary" disabled={working !== 'idle'} onClick={() => { const result = planSimpleWaterfall(scheduleData); if (!result.planned) { setError(result.schedule.planningDiagnostics?.generationIssues?.[0]?.message || 'Check task phases, durations and prerequisites.'); return } setDraftData(result.schedule); setError(''); setActionMessage('Dates recalculated using the current task durations. Save the draft to validate.') }}>Recalculate dates</Button>}</div>
             <div className="planner-task-edit-list">
               {tasks.map((task, taskIndex) => {
+                if (taskFilter !== 'ALL' && task.phase !== taskFilter) return null
                 const listedMembers = members.filter((member) => task.assigneeIds?.includes(member.id) || visibleMemberIds.has(member.id))
                 return <details className="planner-task-editor" key={`${task.title}-${taskIndex}`}>
-                  <summary><span className="planner-task-editor__title"><strong>{task.title || `Task ${taskIndex + 1}`}</strong><small>{task.startDate || 'No start'} → {task.endDate || 'No end'}</small></span><span className={`schedule-preview__priority schedule-preview__priority--${(task.priority || 'medium').toLowerCase()}`}>{task.priority || 'medium'}</span></summary>
+                  <summary><span className="planner-task-editor__title"><strong>{task.title || `Task ${taskIndex + 1}`}</strong><small>{task.phase ? `${taskPhaseLabel(task.phase) || task.phase} · ` : ''}{task.startDate || 'No start'} → {task.endDate || 'No end'}</small></span><span className={`schedule-preview__priority schedule-preview__priority--${(task.priority || 'medium').toLowerCase()}`}>{task.priority || 'medium'}</span></summary>
                   <div className="planner-task-editor__body">
+                    <p className="planner-duration-note">{parentTitles.has(task.title) ? `Summary range: ${durationDays(task.startDate, task.endDate) ?? '—'} calendar days, including waiting between phases. This is not work effort.` : `Task duration: ${durationDays(task.startDate, task.endDate) ?? '—'} calendar days. Staffing and effort still need review.`}</p>
                     <div className="planner-edit-grid planner-edit-grid--task">
+                      {waterfall && !parentTitles.has(task.title) && <Input id={`ai-task-duration-${taskIndex}`} label="Duration (calendar days)" type="number" min={1} step={1} value={task.estimatedDurationDays ?? durationDays(task.startDate, task.endDate) ?? ''} onChange={event => { const value = Number(event.target.value); if (Number.isInteger(value) && value > 0) { const start = Date.parse((task.startDate ?? '') + 'T00:00:00Z'); patchTask(taskIndex, { estimatedDurationDays: value, ...(Number.isFinite(start) ? { endDate: new Date(start + (value - 1) * 86400000).toISOString().slice(0, 10) } : {}) }) } }} disabled={working !== 'idle'} /> }
                       <Input id={`ai-task-title-${taskIndex}`} label="Task title" value={task.title} onChange={(event) => patchTask(taskIndex, { title: event.target.value })} maxLength={160} disabled={working !== 'idle'} />
-                      <Input id={`ai-task-start-${taskIndex}`} label="Start date" type="date" value={task.startDate ?? ''} onChange={(event) => patchTask(taskIndex, { startDate: event.target.value })} disabled={working !== 'idle'} />
-                      <Input id={`ai-task-end-${taskIndex}`} label="End date" type="date" value={task.endDate ?? ''} onChange={(event) => patchTask(taskIndex, { endDate: event.target.value })} disabled={working !== 'idle'} />
+                      <Input id={`ai-task-start-${taskIndex}`} label="Start date" type="date" value={task.startDate ?? ''} onChange={(event) => patchTask(taskIndex, { startDate: event.target.value, estimatedDurationDays: durationDays(event.target.value, task.endDate) ?? undefined })} disabled={working !== 'idle'} />
+                      <Input id={`ai-task-end-${taskIndex}`} label="End date" type="date" value={task.endDate ?? ''} onChange={(event) => patchTask(taskIndex, { endDate: event.target.value, estimatedDurationDays: durationDays(task.startDate, event.target.value) ?? undefined })} disabled={working !== 'idle'} />
                       <Select id={`ai-task-priority-${taskIndex}`} label="Priority" value={(task.priority || 'medium').toLowerCase()} onChange={(event) => patchTask(taskIndex, { priority: event.target.value })} options={[{ value: 'high', label: 'High' }, { value: 'medium', label: 'Medium' }, { value: 'low', label: 'Low' }]} disabled={working !== 'idle'} />
                       <Select id={`ai-task-group-${taskIndex}`} label="Group" value={task.groupTempId ?? ''} onChange={(event) => patchTask(taskIndex, { groupTempId: event.target.value || undefined })} options={[{ value: '', label: 'No group' }, ...groups.map((group) => ({ value: group.tempId, label: group.name }))]} disabled={working !== 'idle'} />
+                      {waterfall && <Select id={`ai-task-phase-${taskIndex}`} label="Phase" value={task.phase ?? ''} onChange={(event) => patchTask(taskIndex, { phase: (event.target.value || null) as TaskPhase | null })} options={[{ value: '', label: parentTitles.has(task.title) ? 'Summary (no phase)' : 'Choose phase' }, ...TASK_PHASES.map(phase => ({ value: phase, label: taskPhaseLabel(phase) }))]} disabled={working !== 'idle'} />}
+                      {waterfall && !parentTitles.has(task.title) && <Input id={`ai-task-deliverable-${taskIndex}`} label="Deliverable" value={task.deliverable ?? ''} onChange={(event) => patchTask(taskIndex, { deliverable: event.target.value })} maxLength={1000} disabled={working !== 'idle'} />}
                       <label className="planner-edit-field planner-edit-field--wide" htmlFor={`ai-task-description-${taskIndex}`}><span>Description</span><textarea id={`ai-task-description-${taskIndex}`} rows={2} value={task.description ?? ''} onChange={(event) => patchTask(taskIndex, { description: event.target.value })} maxLength={2000} disabled={working !== 'idle'} /></label>
                     </div>
                     <fieldset className="planner-member-picker" disabled={working !== 'idle'}><legend>Assignees <span>{task.assigneeIds?.length ?? 0} selected</span></legend>
                       {listedMembers.length ? <div className="planner-member-picker__list planner-member-picker__list--compact">{listedMembers.map((member) => <label className="planner-member-option" key={member.id}><input type="checkbox" checked={!!task.assigneeIds?.includes(member.id)} onChange={() => toggleTaskAssignee(taskIndex, member.id)} /><span><strong>{member.name}</strong><small>{member.position || `Member #${member.id}`}</small></span></label>)}</div> : <p className="planner-assignment-empty">Search for available team members above.</p>}
                     </fieldset>
-                    {!!task.dependsOnTitles?.length && <p className="schedule-preview__dependencies"><strong>Depends on:</strong> {task.dependsOnTitles.join(', ')}</p>}
+                    <Select id={`ai-task-parent-${taskIndex}`} label="Parent task" value={task.parentTitle ?? ''} onChange={event => patchTask(taskIndex, { parentTitle: event.target.value || null })} options={[{ value: '', label: 'No parent' }, ...Array.from(new Set([...tasks.filter(candidate => candidate.title !== task.title).map(candidate => candidate.title), ...(task.parentTitle ? [task.parentTitle] : [])])).map(title => ({ value: title, label: tasks.some(candidate => candidate.title === title) ? title : `${title} (missing)` }))]} disabled={working !== 'idle'} />
+                    <label className="planner-edit-field" htmlFor={`ai-task-dependencies-${taskIndex}`}><span>Prerequisites</span><select className="planner-requirement-select" id={`ai-task-dependencies-${taskIndex}`} multiple size={Math.min(6, Math.max(2, tasks.length - 1))} value={task.dependsOnTitles ?? []} onChange={event => patchTask(taskIndex, { dependsOnTitles: Array.from(event.target.selectedOptions, option => option.value) })} disabled={working !== 'idle'}>{Array.from(new Set([...tasks.filter(candidate => candidate.title !== task.title).map(candidate => candidate.title), ...(task.dependsOnTitles ?? [])])).map(title => <option key={title} value={title}>{title}{tasks.some(candidate => candidate.title === title) ? '' : ' (missing)'}</option>)}</select><small>Select the work that must finish first. Clear incorrect references; use Ctrl/Cmd for multiple selections.</small></label>
                   </div>
                 </details>
               })}

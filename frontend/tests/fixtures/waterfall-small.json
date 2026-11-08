@@ -1,0 +1,159 @@
+{
+  "planningModel": "WATERFALL",
+  "requirementIds": [
+    "FR-AUTH-01",
+    "FR-MENU-01"
+  ],
+  "project": {
+    "name": "Small Waterfall fixture",
+    "description": "Account and menu scope",
+    "startDate": "2026-11-09",
+    "endDate": "2026-11-20"
+  },
+  "newGroups": [
+    {
+      "tempId": "delivery",
+      "name": "Delivery team",
+      "memberIds": []
+    }
+  ],
+  "tasks": [
+    {
+      "title": "Review baseline",
+      "description": "Concrete scope for Review baseline",
+      "phase": "REQUIREMENTS_REVIEW",
+      "deliverable": "Reviewed output for Review baseline",
+      "requirementIds": [
+        "FR-AUTH-01",
+        "FR-MENU-01"
+      ],
+      "priority": "medium",
+      "parentTitle": null,
+      "groupTempId": "delivery",
+      "startDate": "2026-11-09",
+      "endDate": "2026-11-09",
+      "assigneeIds": [],
+      "dependsOnTitles": []
+    },
+    {
+      "title": "Design system",
+      "description": "Concrete scope for Design system",
+      "phase": "DESIGN",
+      "deliverable": "Reviewed output for Design system",
+      "requirementIds": [
+        "FR-AUTH-01",
+        "FR-MENU-01"
+      ],
+      "priority": "medium",
+      "parentTitle": null,
+      "groupTempId": "delivery",
+      "startDate": "2026-11-10",
+      "endDate": "2026-11-11",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Review baseline"
+      ]
+    },
+    {
+      "title": "Account module",
+      "description": "Concrete scope for Account module",
+      "phase": null,
+      "deliverable": "Reviewed output for Account module",
+      "requirementIds": [],
+      "priority": "medium",
+      "parentTitle": null,
+      "groupTempId": "delivery",
+      "startDate": "2026-11-12",
+      "endDate": "2026-11-19",
+      "assigneeIds": [],
+      "dependsOnTitles": []
+    },
+    {
+      "title": "Implement accounts",
+      "description": "Concrete scope for Implement accounts",
+      "phase": "IMPLEMENTATION",
+      "deliverable": "Account capability matching FR-AUTH-01",
+      "requirementIds": [
+        "FR-AUTH-01"
+      ],
+      "priority": "medium",
+      "parentTitle": "Account module",
+      "groupTempId": "delivery",
+      "startDate": "2026-11-12",
+      "endDate": "2026-11-15",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Design system"
+      ]
+    },
+    {
+      "title": "Verify accounts",
+      "description": "Concrete scope for Verify accounts",
+      "phase": "TESTING",
+      "deliverable": "Verification results for account requirements",
+      "requirementIds": [
+        "FR-AUTH-01"
+      ],
+      "priority": "medium",
+      "parentTitle": "Account module",
+      "groupTempId": "delivery",
+      "startDate": "2026-11-17",
+      "endDate": "2026-11-19",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Implement accounts"
+      ]
+    },
+    {
+      "title": "Menu module",
+      "description": "Concrete scope for Menu module",
+      "phase": null,
+      "deliverable": "Reviewed output for Menu module",
+      "requirementIds": [],
+      "priority": "medium",
+      "parentTitle": null,
+      "groupTempId": "delivery",
+      "startDate": "2026-11-12",
+      "endDate": "2026-11-20",
+      "assigneeIds": [],
+      "dependsOnTitles": []
+    },
+    {
+      "title": "Implement menu",
+      "description": "Concrete scope for Implement menu",
+      "phase": "IMPLEMENTATION",
+      "deliverable": "Menu capability matching FR-MENU-01",
+      "requirementIds": [
+        "FR-MENU-01"
+      ],
+      "priority": "medium",
+      "parentTitle": "Menu module",
+      "groupTempId": "delivery",
+      "startDate": "2026-11-12",
+      "endDate": "2026-11-16",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Design system"
+      ]
+    },
+    {
+      "title": "Verify menu",
+      "description": "Concrete scope for Verify menu",
+      "phase": "TESTING",
+      "deliverable": "Verification results for menu requirements",
+      "requirementIds": [
+        "FR-MENU-01"
+      ],
+      "priority": "medium",
+      "parentTitle": "Menu module",
+      "groupTempId": "delivery",
+      "startDate": "2026-11-17",
+      "endDate": "2026-11-20",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Implement menu"
+      ]
+    }
+  ],
+  "aiNote": "Review scope and estimates before approval."
+}

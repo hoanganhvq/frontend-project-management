@@ -6,6 +6,7 @@ import { Dialog } from '../../components/ui/Dialog'
 import { FormField } from '../../components/ui/FormField'
 import { Input } from '../../components/ui/Input'
 import { Select } from '../../components/ui/Select'
+import { TASK_PHASES, taskPhaseLabel, type TaskPhase } from '../../types/domain'
 import type { Task, TaskBoardColumn, TaskPriority, TaskStatus } from '../../types/domain'
 import { getSettingsPreferences } from '../../app/settingsPreferences'
 
@@ -25,7 +26,7 @@ function initialValues(projectId: number, task?: Task, initialBoardColumn?: Task
   const status = initialBoardColumn ?? defaultStatus
   const boardColumn = status === 'canceled' ? undefined : status
   return task
-    ? { projectId: task.projectId, groupId: task.groupId, parentTaskId: task.parentTaskId, title: task.title, description: task.description, startDate: task.startDate, endDate: task.endDate, progress: task.progress, priority: task.priority, status: task.status, boardColumn: task.boardColumn, assigneeName: task.assigneeName ?? '', module: task.module ?? '', estimateHours: task.estimateHours, dependencyIds: task.dependencyIds ?? [] }
+    ? { phase: task.phase ?? null, deliverable: task.deliverable, requirementIds: task.requirementIds, projectId: task.projectId, groupId: task.groupId, parentTaskId: task.parentTaskId, title: task.title, description: task.description, startDate: task.startDate, endDate: task.endDate, progress: task.progress, priority: task.priority, status: task.status, boardColumn: task.boardColumn, assigneeName: task.assigneeName ?? '', module: task.module ?? '', estimateHours: task.estimateHours, dependencyIds: task.dependencyIds ?? [] }
     : { projectId, groupId: null, parentTaskId: null, title: '', description: '', startDate: '', endDate: '', progress: 0, priority: 'medium', status, boardColumn, assigneeName: '', module: '', estimateHours: undefined, dependencyIds: [] }
 }
 
@@ -73,6 +74,9 @@ export function TaskFormDialog({ open, projectId, task, initialBoardColumn, onCl
     <form id="task-form" className="form-grid" onSubmit={submit}>
       <FormField label="Task title" htmlFor="task-title" required><Input id="task-title" value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} required maxLength={120} autoFocus /></FormField>
       <FormField label="Description" htmlFor="task-description"><Input id="task-description" value={values.description} onChange={(event) => setValues({ ...values, description: event.target.value })} maxLength={1000} /></FormField>
+      <Select id="task-phase" label="Phase" value={values.phase ?? ''} onChange={(event) => setValues({ ...values, phase: (event.target.value || null) as TaskPhase | null })} options={[{ value: '', label: 'No phase / summary' }, ...TASK_PHASES.map(phase => ({ value: phase, label: taskPhaseLabel(phase) }))]} />
+      <FormField label="Deliverable" htmlFor="task-deliverable"><Input id="task-deliverable" value={values.deliverable ?? ''} onChange={(event) => setValues({ ...values, deliverable: event.target.value })} maxLength={1000} /></FormField>
+      {!!values.requirementIds?.length && <p>Requirements: {values.requirementIds.join(', ')}</p>}
       <div className="form-grid__two">
         <FormField label="Start date" htmlFor="task-start"><Input id="task-start" type="date" value={values.startDate} onChange={(event) => setValues({ ...values, startDate: event.target.value })} /></FormField>
         <FormField label="Due date" htmlFor="task-end" error={dateError}><Input id="task-end" type="date" value={values.endDate} onChange={(event) => setValues({ ...values, endDate: event.target.value })} /></FormField>

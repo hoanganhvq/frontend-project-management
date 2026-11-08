@@ -234,3 +234,38 @@
   .planner-stepper li > span,.document-dropzone { transition: none; }
   .planner-spinner,.planner-generation-progress__bar > span { animation-duration: 2.5s; }
 }
+
+.planner-requirement-select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0.5rem;
+  font: inherit;
+  color: inherit;
+  background: var(--color-surface, Canvas);
+  border: 1px solid var(--color-border, GrayText);
+  border-radius: 0.5rem;
+}
+
+.planner-review-notes summary {
+  cursor: pointer;
+  padding-block: 0.75rem;
+}
+
+.planner-review-notes li {
+  margin-block: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.planner-review-notes li > span,
+.planner-review-notes li > small {
+  display: block;
+}
+.planner-validation { overflow-wrap: anywhere; }
+.planner-validation ul { padding-left: 1.25rem; }
+.planner-validation li { margin-block: .75rem; }
+.planner-issue-link { color: var(--color-text, inherit); text-align: left; background: transparent; border: 0; text-decoration: underline; cursor: pointer; padding: .25rem 0; font: inherit; }
+.planner-issue-link:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.planner-task-controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin-block: 1rem; }
+.planner-task-controls > :first-child { min-width: 12rem; flex: 1; }
+.planner-duration-note { overflow-wrap: anywhere; }

@@ -13,7 +13,7 @@ import { Select } from '../../components/ui/Select'
 import { ErrorState, LoadingState } from '../../components/ui/States'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { formatDate, formatDateRange, priorityTone, taskTone, toLocalDateInput } from '../../lib/format'
-import { taskStatusLabel } from '../../types/domain'
+import { taskPhaseLabel, taskStatusLabel } from '../../types/domain'
 import { taskBoardColumn } from '../../types/domain'
 import type { Task, TaskBoardColumn } from '../../types/domain'
 import { TaskFormDialog } from './TaskFormDialog'
@@ -98,7 +98,7 @@ export function TasksPage() {
             const overdue = !!task.endDate && task.endDate < today && task.status !== 'done'
             const dueSoon = !!task.endDate && task.endDate >= today && task.endDate <= soon && task.status !== 'done'
             return <article className="task-card" key={task.id} draggable onDragStart={(event) => { event.dataTransfer.setData('text/plain', String(task.id)); event.dataTransfer.effectAllowed = 'move' }}>
-              <div className="task-card__top"><StatusBadge tone={priorityTone(task.priority)}>{task.priority[0].toUpperCase() + task.priority.slice(1)}</StatusBadge><Button variant="ghost" size="sm" aria-label={`Edit ${task.title}`} onClick={() => setEditTask(task)}>Edit</Button></div>
+              <div className="task-card__top">{task.phase && <StatusBadge tone="blue">{taskPhaseLabel(task.phase)}</StatusBadge>}<StatusBadge tone={priorityTone(task.priority)}>{task.priority[0].toUpperCase() + task.priority.slice(1)}</StatusBadge><Button variant="ghost" size="sm" aria-label={`Edit ${task.title}`} onClick={() => setEditTask(task)}>Edit</Button></div>
               <button className="task-card__title" type="button" onClick={() => navigate(taskDetailPath(task.id, '/tasks'))}>{task.title}</button>
               <span className="task-card__project">{project?.name ?? 'Project unavailable'}{task.groupId ? ` · ${groupNames[task.groupId] ?? 'Group unavailable'}` : ''}</span>
               <div className="task-card__meta"><TaskAssignees assignees={task.assignees ?? []} /><span>{task.endDate ? formatDate(task.endDate) : 'No due date'}</span></div>
@@ -217,10 +217,12 @@ export function TaskDetailPage({ id }: { id: number }) {
       <div className="task-overview__heading"><div><p className="page-header__eyebrow">AT A GLANCE</p><h2 id="task-overview-heading">Task information</h2></div><span className="task-overview__hint">Status, priority, and schedule</span></div>
       <div className="task-detail-summary">
         <div className="task-detail-fact"><span>Status</span><StatusBadge tone={taskTone(task.status)}>{taskStatusLabel(task.status)}</StatusBadge></div>
+        <div className="task-detail-fact"><span>Phase</span><strong>{taskPhaseLabel(task.phase)}</strong></div>
         <div className="task-detail-fact"><span>Priority</span><StatusBadge tone={priorityTone(task.priority)}>{priorityLabel}</StatusBadge></div>
         <div className="task-detail-fact"><span>Schedule</span><strong>{formatDateRange(task.startDate, task.endDate)}</strong></div>
       </div>
     </section>
+    {(task.deliverable || !!task.requirementIds?.length) && <section className="content-panel" aria-label="Planning details"><h2>Deliverable & requirements</h2>{task.deliverable && <p>{task.deliverable}</p>}{!!task.requirementIds?.length && <p>Requirements: {task.requirementIds.join(', ')}</p>}</section>}
     <section className="task-description-panel content-panel" aria-labelledby="task-description-heading"><div className="task-description-panel__heading"><span className="task-description-panel__icon"><Icon name="list" /></span><div><p className="page-header__eyebrow">TASK BRIEF</p><h2 id="task-description-heading">Description</h2></div></div><div className="task-description-panel__body">{task.description?.trim() || 'No description has been added for this task yet.'}</div></section>
     <section className="task-relations content-panel" aria-labelledby="task-relations-heading">
       <div className="task-relations__heading"><div><p className="page-header__eyebrow">COLLABORATION</p><h2 id="task-relations-heading">People & dependencies</h2></div><span className="task-overview__hint">Manage ownership and task order</span></div>

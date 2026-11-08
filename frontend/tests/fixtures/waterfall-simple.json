@@ -1,0 +1,156 @@
+{
+  "planningModel": "WATERFALL",
+  "project": {
+    "name": "Small Waterfall fixture",
+    "description": "Account and menu scope",
+    "startDate": "2026-11-09",
+    "endDate": "2026-11-21"
+  },
+  "newGroups": [
+    {
+      "tempId": "delivery",
+      "name": "Delivery team",
+      "memberIds": []
+    }
+  ],
+  "tasks": [
+    {
+      "title": "Review baseline",
+      "description": "Concrete scope for Review baseline",
+      "phase": "REQUIREMENTS_REVIEW",
+      "deliverable": "Reviewed output for Review baseline",
+      "priority": "medium",
+      "parentTitle": null,
+      "groupTempId": "delivery",
+      "startDate": "2026-11-09",
+      "endDate": "2026-11-09",
+      "assigneeIds": [],
+      "dependsOnTitles": [],
+      "estimatedDurationDays": 1
+    },
+    {
+      "title": "Design system",
+      "description": "Concrete scope for Design system",
+      "phase": "DESIGN",
+      "deliverable": "Reviewed output for Design system",
+      "priority": "medium",
+      "parentTitle": null,
+      "groupTempId": "delivery",
+      "startDate": "2026-11-10",
+      "endDate": "2026-11-11",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Review baseline"
+      ],
+      "estimatedDurationDays": 2
+    },
+    {
+      "title": "Account module",
+      "description": "Concrete scope for Account module",
+      "phase": null,
+      "deliverable": "Reviewed output for Account module",
+      "priority": "medium",
+      "parentTitle": null,
+      "groupTempId": "delivery",
+      "startDate": "2026-11-12",
+      "endDate": "2026-11-19",
+      "assigneeIds": [],
+      "dependsOnTitles": []
+    },
+    {
+      "title": "Implement accounts",
+      "description": "Concrete scope for Implement accounts",
+      "phase": "IMPLEMENTATION",
+      "deliverable": "Account capability matching FR-AUTH-01",
+      "priority": "medium",
+      "parentTitle": "Account module",
+      "groupTempId": "delivery",
+      "startDate": "2026-11-12",
+      "endDate": "2026-11-15",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Design system"
+      ],
+      "estimatedDurationDays": 4
+    },
+    {
+      "title": "Verify accounts",
+      "description": "Concrete scope for Verify accounts",
+      "phase": "TESTING",
+      "deliverable": "Verification results for account requirements",
+      "priority": "medium",
+      "parentTitle": "Account module",
+      "groupTempId": "delivery",
+      "startDate": "2026-11-17",
+      "endDate": "2026-11-19",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Implement accounts"
+      ],
+      "estimatedDurationDays": 3
+    },
+    {
+      "title": "Menu module",
+      "description": "Concrete scope for Menu module",
+      "phase": null,
+      "deliverable": "Reviewed output for Menu module",
+      "priority": "medium",
+      "parentTitle": null,
+      "groupTempId": "delivery",
+      "startDate": "2026-11-12",
+      "endDate": "2026-11-20",
+      "assigneeIds": [],
+      "dependsOnTitles": []
+    },
+    {
+      "title": "Implement menu",
+      "description": "Concrete scope for Implement menu",
+      "phase": "IMPLEMENTATION",
+      "deliverable": "Menu capability matching FR-MENU-01",
+      "priority": "medium",
+      "parentTitle": "Menu module",
+      "groupTempId": "delivery",
+      "startDate": "2026-11-12",
+      "endDate": "2026-11-16",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Design system"
+      ],
+      "estimatedDurationDays": 5
+    },
+    {
+      "title": "Verify menu",
+      "description": "Concrete scope for Verify menu",
+      "phase": "TESTING",
+      "deliverable": "Verification results for menu requirements",
+      "priority": "medium",
+      "parentTitle": "Menu module",
+      "groupTempId": "delivery",
+      "startDate": "2026-11-17",
+      "endDate": "2026-11-20",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Implement menu"
+      ],
+      "estimatedDurationDays": 4
+    },
+    {
+      "title": "Package and hand over",
+      "description": "Package the verified application and its usage notes for review.",
+      "phase": "DEPLOYMENT",
+      "deliverable": "Application package and handover notes",
+      "estimatedDurationDays": 1,
+      "priority": "medium",
+      "parentTitle": null,
+      "groupTempId": "delivery",
+      "assigneeIds": [],
+      "dependsOnTitles": [
+        "Verify menu"
+      ],
+      "startDate": "2026-11-21",
+      "endDate": "2026-11-21"
+    }
+  ],
+  "aiNote": "Review scope and estimates before approval.",
+  "planningPolicy": "WATERFALL_SIMPLE_V1"
+}

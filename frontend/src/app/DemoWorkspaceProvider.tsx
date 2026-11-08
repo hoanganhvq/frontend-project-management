@@ -45,6 +45,7 @@ function mapProject(project: ProjectResponse): Project {
 function mapTask(task: TaskResponse): Task {
   return {
     assignees: task.assignees ?? [],
+    phase: task.phase ?? null, deliverable: task.deliverable ?? null, requirementIds: task.requirementIds ?? [],
     id: task.id, projectId: task.projectId, groupId: task.groupId, parentTaskId: task.parentTaskId,
     title: task.title, description: task.description ?? '', startDate: task.startDate ?? '', endDate: task.endDate ?? '',
     progress: task.progress ?? 0, priority: task.priority, status: task.status,
@@ -136,6 +137,7 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
     try {
       const created = await tasksApi.create({
         projectId: task.projectId, groupId: task.groupId, parentTaskId: task.parentTaskId,
+        phase: task.phase ?? null, deliverable: task.deliverable, requirementIds: task.requirementIds,
         title: task.title, description: task.description, startDate: task.startDate || null, endDate: task.endDate || null,
         progress: task.progress, priority: task.priority, status: task.status, createdById: user.id,
       })
@@ -152,6 +154,9 @@ export function DemoWorkspaceProvider({ user, children }: { user: User; children
       const updated = await tasksApi.update(id, {
         groupId: changes.groupId ?? task.groupId, parentTaskId: changes.parentTaskId ?? task.parentTaskId,
         title: changes.title ?? task.title, description: changes.description ?? task.description,
+        phase: changes.phase === undefined ? task.phase : changes.phase,
+        deliverable: changes.deliverable === undefined ? task.deliverable : changes.deliverable,
+        requirementIds: changes.requirementIds ?? task.requirementIds,
         startDate: (changes.startDate ?? task.startDate) || null, endDate: (changes.endDate ?? task.endDate) || null,
         progress: changes.progress ?? (status === 'done' ? 100 : task.progress), priority: changes.priority ?? task.priority, status,
       })
