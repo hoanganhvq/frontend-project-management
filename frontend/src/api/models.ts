@@ -32,7 +32,7 @@ export type SavePendingScheduleResponse = { scheduleId: number }
 export type UpdatePendingScheduleRequest = { scheduleData: Record<string, unknown> }
 export type AiScheduleMember = { id: number; name: string; position: string | null }
 export type AiScheduleTaskPreview = { estimatedDurationDays?: number; phase?: TaskPhase | null; deliverable?: string | null; requirementIds?: string[]; title: string; description?: string; priority?: string; startDate?: string; endDate?: string; parentTitle?: string | null; groupTempId?: string; assigneeIds?: number[]; dependsOnTitles?: string[] }
-export type ScheduleValidationReport = { policyVersion: string; validationState: 'READY' | 'NEEDS_REVIEW'; issues: Array<{ code: string; message: string; path: string; taskTitle: string | null; requirementIds: string[]; severity: string; blocksApproval: boolean }> }
+export type ScheduleValidationReport = { policyVersion: string; validationState: 'READY' | 'NEEDS_REVIEW'; reviewFingerprint?: string; issues: Array<{ code: string; message: string; path: string; taskTitle: string | null; requirementIds: string[]; severity: string; blocksApproval: boolean }> }
 export type AiScheduleResponse = {
   id: number
   status: string
@@ -63,7 +63,7 @@ export type AiScheduleResponse = {
   }
 }
 export type AiScheduleSummary = { id: number; status: string; sessionId: string | null; createdAt: string; projectName: string; totalGroups: number; totalTasks: number }
-export type ApproveScheduleRequest = { scheduleId: number; leaderId: number }
+export type ApproveScheduleRequest = { scheduleId: number; leaderId: number; acceptWarnings?: boolean; reviewFingerprint?: string }
 export type ApproveScheduleResponse = { success: boolean; projectId: number; totalTasksInserted: number; message: string }
 export type RejectScheduleRequest = { scheduleId: number; reason: string }
 export type RejectScheduleResponse = { success: boolean; message: string }

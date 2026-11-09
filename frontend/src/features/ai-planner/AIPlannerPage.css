@@ -269,3 +269,10 @@
 .planner-task-controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin-block: 1rem; }
 .planner-task-controls > :first-child { min-width: 12rem; flex: 1; }
 .planner-duration-note { overflow-wrap: anywhere; }
+.planner-validation-errors { border-left: 3px solid #b42318; padding-left: 1rem; }
+.planner-validation-warnings { border-left: 3px solid #a15c00; padding-left: 1rem; margin-top: 1rem; }
+.planner-warning-list { padding-left: 1.25rem; overflow-wrap: anywhere; }
+.planner-warning-list li { margin-block: .75rem; }
+.planner-warning-acceptance { display: flex; align-items: flex-start; gap: .75rem; padding-block: 1rem; cursor: pointer; }
+.planner-warning-acceptance input { margin-top: .25rem; flex: none; }
+.planner-validation--ready { color: var(--color-text); background: var(--color-surface); border-color: var(--color-border); }

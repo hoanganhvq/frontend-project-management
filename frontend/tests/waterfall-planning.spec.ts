@@ -4,7 +4,7 @@ import type { AiScheduleResponse, ScheduleValidationReport } from '../src/api/mo
 
 async function fixture(page: Page) {
   const data = JSON.parse(readFileSync(new URL('./fixtures/waterfall-small.json', import.meta.url), 'utf8')) as AiScheduleResponse['scheduleData']
-  const state = { data, validation: { policyVersion: 'waterfall-review-v1', validationState: 'READY', issues: [] } as ScheduleValidationReport, writes: [] as AiScheduleResponse['scheduleData'][], fail: false, approvalRace: false, approvals: 0, rejections: 0, taskWrites: [] as Record<string, unknown>[] }
+  const state = { data, validation: { policyVersion: 'waterfall-review-v1', validationState: 'READY', issues: [] } as ScheduleValidationReport, writes: [] as AiScheduleResponse['scheduleData'][], fail: false, approvalRace: false, warningRace: false, approvals: 0, approvalPayloads: [] as Record<string, unknown>[], rejections: 0, taskWrites: [] as Record<string, unknown>[] }
   const tasks = [{ id: 7, projectId: 4, groupId: null, parentTaskId: null, title: 'Implement accounts', description: 'Account scope',
     startDate: '2026-11-12', endDate: '2026-11-15', progress: 0, priority: 'medium', status: 'todo', assignees: [], createdAt: '',
     phase: 'IMPLEMENTATION', deliverable: 'Working accounts', requirementIds: ['FR-AUTH-01'] }]
@@ -30,13 +30,144 @@ async function fixture(page: Page) {
         body = { scheduleId: 8 }
       } else body = { id: 8, status: 'pending', sessionId: 'test-session', scheduleData: state.data, validation: state.validation }
     }
-    if (path === '/api/ai-schedules/approve') { state.approvals++; if (state.approvalRace) return route.fulfill({ status: 422, json: { message: 'Draft changed and needs review', validation: { ...state.validation, validationState: 'NEEDS_REVIEW', issues: [{ code: 'TASK_PHASE', message: 'Choose a valid phase.', path: '/tasks/3/phase', taskTitle: 'Implement accounts', requirementIds: [], severity: 'ERROR', blocksApproval: true }] } } }); body = { success: true, projectId: 4, totalTasksInserted: 8, message: 'Project created' } }
+    if (path === '/api/ai-schedules/approve') {
+      state.approvals++; state.approvalPayloads.push(route.request().postDataJSON())
+      if (state.warningRace) {
+        state.validation = { ...state.validation, reviewFingerprint: 'changed-draft' }
+        return route.fulfill({ status: 422, json: { code: 'DRAFT_REVIEW_CONFIRMATION_REQUIRED', message: 'The draft changed. Review the latest validation and confirm again.', validation: state.validation } })
+      }
+      if (state.approvalRace) return route.fulfill({ status: 422, json: { message: 'Draft changed and needs review', validation: { ...state.validation, validationState: 'NEEDS_REVIEW', issues: [{ code: 'TASK_PHASE', message: 'Choose a valid phase.', path: '/tasks/3/phase', taskTitle: 'Implement accounts', requirementIds: [], severity: 'ERROR', blocksApproval: true }] } } })
+      body = { success: true, projectId: 4, totalTasksInserted: 8, message: 'Project created' }
+    }
     if (path === '/api/ai-schedules/reject') { state.rejections++; body = { success: true, message: 'Schedule rejected' } }
     if (path === '/api/notifications') body = { content: [], unreadCount: 0, totalElements: 0, totalPages: 0, page: 0, size: 4 }
     return route.fulfill({ json: body })
   })
   return state
 }
+
+function staffingWarning(): ScheduleValidationReport {
+  return { policyVersion: 'waterfall-review-v2', validationState: 'READY', reviewFingerprint: 'reviewed-draft', issues: [{ code: 'UNASSIGNED_TASKS', message: 'Staffing will be completed after approval.', path: '/tasks', taskTitle: null, requirementIds: [], severity: 'WARNING', blocksApproval: false }] }
+}
+
+test('phase preview counts executable tasks separately and task panel edits the shared draft', async ({ page }) => {
+  const state = await fixture(page)
+  await page.goto('/ai-planner?scheduleId=8')
+  const preview = page.getByRole('region', { name: 'Draft plan preview', exact: true })
+  const parents = new Set(state.data.tasks!.map(task => task.parentTitle).filter(Boolean))
+  await expect(preview.locator('.draft-preview-metrics > div').first()).toContainText(String(state.data.tasks!.filter(task => !parents.has(task.title)).length))
+  await preview.getByRole('button', { name: 'Expand all', exact: true }).click()
+  await preview.locator('.draft-preview-task').filter({ hasText: 'Implement accounts' }).click()
+  const panel = page.locator('.draft-task-dialog')
+  const originalDates = [state.data.tasks![3].startDate, state.data.tasks![3].endDate]
+  await panel.getByLabel('Task title', { exact: true }).fill('Accounts revised by PM')
+  await panel.getByLabel('Duration (calendar days)', { exact: true }).fill('2')
+  await panel.getByRole('button', { name: 'Save draft', exact: true }).click()
+  await expect.poll(() => state.writes.length).toBe(1)
+  expect(state.data.tasks![3].title).toBe('Accounts revised by PM')
+  expect(state.data.tasks![3].estimatedDurationDays).toBe(2)
+  expect([state.data.tasks![3].startDate, state.data.tasks![3].endDate]).toEqual(originalDates)
+  expect(state.data.tasks!.some(task => task.dependsOnTitles?.includes('Implement accounts'))).toBe(false)
+  await panel.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(preview.locator('.draft-preview-task').filter({ hasText: 'Accounts revised by PM' })).toBeVisible()
+  await page.reload()
+  await preview.getByRole('button', { name: 'Expand all', exact: true }).click()
+  await expect(preview.locator('.draft-preview-task').filter({ hasText: 'Accounts revised by PM' })).toBeVisible()
+})
+
+test('print report includes every collapsed task and safely renders source text', async ({ page }) => {
+  const state = await fixture(page)
+  state.data.tasks![3].description = '<img src=x onerror="window.pwned=true"> Mô tả tiếng Việt & scope'
+  state.data.tasks![3].deliverable = 'Kết quả đầy đủ'
+  await page.goto('/ai-planner?scheduleId=8')
+  const preview = page.getByRole('region', { name: 'Draft plan preview', exact: true })
+  const popupPromise = page.waitForEvent('popup')
+  await preview.getByRole('button', { name: 'Print / Save PDF', exact: true }).click()
+  const report = await popupPromise
+  await expect(report.locator('article.task')).toHaveCount(state.data.tasks!.length)
+  await expect(report.locator('body')).toContainText(state.data.tasks![3].description!)
+  await expect(report.locator('body')).toContainText('Kết quả đầy đủ')
+  await expect(report.locator('body')).toContainText('Draft — not approved')
+  await expect(report.locator('img,script')).toHaveCount(0)
+  expect(await report.evaluate(() => (window as Window & { pwned?: boolean }).pwned)).toBeUndefined()
+  expect(state.writes).toHaveLength(0)
+  await report.close()
+})
+
+test('Gantt keeps invalid and unphased work visible and exports complete SVG and PNG', async ({ page }) => {
+  const state = await fixture(page)
+  state.data.tasks![3].phase = null
+  state.data.tasks![3].startDate = 'bad-date'
+  state.validation = { policyVersion: 'waterfall-review-v2', validationState: 'NEEDS_REVIEW', issues: [{ code: 'TASK_START', message: 'Choose a valid start date.', path: '/tasks/3/startDate', taskTitle: 'Implement accounts', severity: 'ERROR', blocksApproval: true, requirementIds: [] }] }
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/ai-planner?scheduleId=8')
+  const preview = page.getByRole('region', { name: 'Draft plan preview', exact: true })
+  await expect(preview).toContainText('Needs phase assignment')
+  await preview.getByRole('tab', { name: 'Gantt', exact: true }).click()
+  await preview.getByRole('button', { name: 'Expand all', exact: true }).click()
+  const row = preview.getByRole('button', { name: 'Review Implement accounts', exact: true })
+  await expect(row).toContainText('No valid dates')
+  await row.click()
+  const panel = page.getByRole('dialog', { name: 'Implement accounts', exact: true })
+  await expect(panel).toContainText('Choose a valid start date.')
+  await expect(panel.getByRole('button', { name: 'Recalculate plan dates', exact: true })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await panel.getByRole('button', { name: 'Done', exact: true }).click()
+  await preview.getByRole('button', { name: 'Collapse all', exact: true }).click()
+  const svgPromise = page.waitForEvent('download')
+  await preview.getByRole('button', { name: 'Download SVG', exact: true }).click()
+  const svg = await svgPromise, contents = readFileSync((await svg.path())!, 'utf8')
+  for (const task of state.data.tasks!) expect(contents).toContain(task.title)
+  expect(contents).toContain('DRAFT — NOT APPROVED')
+  expect(await page.evaluate(text => new DOMParser().parseFromString(text, 'image/svg+xml').querySelector('parsererror') === null, contents)).toBe(true)
+  const pngPromise = page.waitForEvent('download')
+  await preview.getByRole('button', { name: 'Download PNG', exact: true }).click()
+  const png = await pngPromise
+  expect(readFileSync((await png.path())!).subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  expect(state.approvals).toBe(0)
+})
+
+test('warnings are separate from blockers and require explicit acceptance for this draft', async ({ page }) => {
+  const state = await fixture(page); state.validation = staffingWarning()
+  await page.goto('/ai-planner?scheduleId=8')
+  const validation = page.getByRole('region', { name: 'Draft validation' })
+  await expect(validation).toContainText('Ready with warnings')
+  await expect(validation).toContainText('1 warnings')
+  await expect(validation).not.toContainText('blocking issues')
+  await page.getByRole('button', { name: 'Approve schedule', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Review warnings before approval' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Accept warnings and approve' })).toBeDisabled()
+  expect(state.approvals).toBe(0)
+  await dialog.getByRole('button', { name: 'Back to draft' }).click()
+  expect(state.approvals).toBe(0)
+  await page.getByRole('button', { name: 'Approve schedule', exact: true }).click()
+  await dialog.getByRole('checkbox').check()
+  await dialog.getByRole('button', { name: 'Accept warnings and approve' }).click()
+  await expect.poll(() => state.approvals).toBe(1)
+  expect(state.approvalPayloads[0]).toMatchObject({ acceptWarnings: true, reviewFingerprint: 'reviewed-draft' })
+  await expect(page.getByRole('heading', { name: 'Project created', exact: true })).toBeVisible()
+})
+
+test('a changed draft cannot reuse warning acceptance and requires a new unchecked confirmation', async ({ page }) => {
+  const state = await fixture(page); state.validation = staffingWarning(); state.warningRace = true
+  await page.goto('/ai-planner?scheduleId=8')
+  await page.getByRole('button', { name: 'Approve schedule', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Review warnings before approval' })
+  await dialog.getByRole('checkbox').check()
+  await dialog.getByRole('button', { name: 'Accept warnings and approve' }).click()
+  await expect(page.getByRole('alert')).toContainText('draft changed')
+  await expect(page.getByRole('button', { name: 'Save draft', exact: true })).toBeVisible()
+  expect(state.approvals).toBe(1)
+  state.warningRace = false
+  await page.getByRole('button', { name: 'Approve schedule', exact: true }).click()
+  await expect(dialog.getByRole('checkbox')).not.toBeChecked()
+  await dialog.getByRole('checkbox').check()
+  await dialog.getByRole('button', { name: 'Accept warnings and approve' }).click()
+  await expect.poll(() => state.approvals).toBe(2)
+  expect(state.approvalPayloads[1]).toMatchObject({ reviewFingerprint: 'changed-draft', acceptWarnings: true })
+})
 
 test('reviewable draft saves and reopens, links errors to fields, and blocks approval', async ({ page }) => {
   const state = await fixture(page)
@@ -119,7 +250,7 @@ test('Waterfall draft retains metadata across editing, reload and approval', asy
   const state = await fixture(page)
   await page.goto('/ai-planner?scheduleId=8')
   const coverage = page.getByRole('region', { name: 'Waterfall phases' })
-  await expect(coverage).toContainText('Implementation: 2')
+  await expect(coverage.locator('.draft-preview-phase-toggle').filter({ hasText: 'Implementation' })).toContainText('2 tasks')
   await expect(page.getByLabel('Requirements covered')).toHaveCount(0)
   await page.locator('.planner-task-editor').nth(3).locator('summary').click()
   await expect(page.locator('#ai-task-phase-3')).toHaveValue('IMPLEMENTATION')
@@ -199,4 +330,7 @@ test('computed dates and task repair explanations remain visible after saving an
   await notes.getByText('View task repairs', { exact: true }).click()
   await expect(notes.getByText('Menu verification covers FR-MENU-01 behavior.')).toBeVisible()
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.getByRole('button', { name: 'Approve schedule', exact: true }).click()
+  await expect.poll(() => state.approvals).toBe(1)
+  await expect(page.getByRole('dialog')).not.toBeVisible()
 })

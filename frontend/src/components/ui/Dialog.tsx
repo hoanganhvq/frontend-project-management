@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { Icon } from './Icon'
 
 type DialogProps = {
+  className?: string
   open: boolean
   title: string
   description?: string
@@ -10,7 +11,7 @@ type DialogProps = {
   actions?: ReactNode
 }
 
-export function Dialog({ open, title, description, onClose, children, actions }: DialogProps) {
+export function Dialog({ open, title, description, onClose, children, actions, className = '' }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const descriptionId = useId()
@@ -24,7 +25,7 @@ export function Dialog({ open, title, description, onClose, children, actions }:
 
   return <dialog
     ref={dialogRef}
-    className="dialog"
+    className={`dialog ${className}`.trim()}
     aria-labelledby={titleId}
     aria-describedby={description ? descriptionId : undefined}
     onCancel={(event) => { event.preventDefault(); onClose() }}

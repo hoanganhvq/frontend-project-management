@@ -6,6 +6,7 @@ import { ApiError } from '../../api/client'
 import type { AiScheduleMember, AiScheduleResponse, AiScheduleSummary, ScheduleValidationReport } from '../../api/models'
 import { aiSchedulesApi } from '../../api/services'
 import { Button } from '../../components/ui/Button'
+import { Dialog } from '../../components/ui/Dialog'
 import { ErrorState } from '../../components/ui/States'
 import { Icon } from '../../components/ui/Icon'
 import { Input } from '../../components/ui/Input'
@@ -14,6 +15,7 @@ import { Select } from '../../components/ui/Select'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { TASK_PHASES, taskPhaseLabel, type TaskPhase } from '../../types/domain'
 import { planSimpleWaterfall } from './simpleWaterfall.js'
+import { DraftPlanPreview } from './DraftPlanPreview'
 import './AIPlannerPage.css'
 
 function durationDays(start?: string, end?: string) {
@@ -52,6 +54,9 @@ export function AIPlannerPage() {
   const [working, setWorking] = useState<'idle' | 'saving' | 'approving' | 'rejecting'>('idle')
   const [actionMessage, setActionMessage] = useState('')
   const [lastDecision, setLastDecision] = useState<'Approve' | 'Reject' | null>(null)
+  const [warningConfirmation, setWarningConfirmation] = useState<ScheduleValidationReport | null>(null)
+  const [warningsAccepted, setWarningsAccepted] = useState(false)
+  const [reviewNeedsReload, setReviewNeedsReload] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
   const generationAbort = useRef<AbortController | null>(null)
@@ -125,6 +130,7 @@ export function AIPlannerPage() {
     setActionMessage('')
     try {
       const savedSchedule = await aiSchedulesApi.getPendingById(draftId)
+      setReviewNeedsReload(false)
       setSchedule(savedSchedule)
       setScheduleId(savedSchedule.id)
       setDraftData(JSON.parse(JSON.stringify(savedSchedule.scheduleData)))
@@ -199,7 +205,6 @@ export function AIPlannerPage() {
   const tasks = scheduleData?.tasks ?? []
   const waterfall = scheduleData?.planningModel === 'WATERFALL'
   const parentTitles = new Set(tasks.map(task => task.parentTitle).filter(Boolean))
-  const executableTasks = tasks.filter(task => !parentTitles.has(task.title))
   const hasUnsavedChanges = !!schedule && !!draftData && JSON.stringify(schedule.scheduleData) !== JSON.stringify(draftData)
   const validation = schedule?.validation
 
@@ -222,6 +227,15 @@ export function AIPlannerPage() {
     let number = tasks.length + 1
     while (tasks.some(task => task.title === `New task ${number}`)) number++
     setDraftData(current => current ? { ...current, tasks: [...(current.tasks ?? []), { title: `New task ${number}`, description: '', deliverable: '', phase: null, parentTitle: null, groupTempId: groups[0]?.tempId, assigneeIds: [], dependsOnTitles: [], requirementIds: [], startDate: current.project?.startDate, endDate: current.project?.startDate }] } : current)
+  }
+
+  function recalculateDraftDates() {
+    if (!draftData) return
+    const result = planSimpleWaterfall(draftData)
+    if (!result.planned) { setError(result.schedule.planningDiagnostics?.generationIssues?.[0]?.message || 'Check task phases, durations and prerequisites.'); return }
+    setDraftData(result.schedule)
+    setError('')
+    setActionMessage('Dates recalculated using the current task durations. Save the draft to validate.')
   }
 
   function addGroup() {
@@ -329,7 +343,7 @@ export function AIPlannerPage() {
     }
   }
 
-  async function sendDecision(decision: 'Approve' | 'Reject') {
+  async function sendDecision(decision: 'Approve' | 'Reject', acceptedReview?: ScheduleValidationReport) {
     if (!schedule || !draftData || !user?.id) return
     if (!draftData.project?.name?.trim()) {
       setError('Add a project name before sending this decision.')
@@ -342,19 +356,29 @@ export function AIPlannerPage() {
     setWorking(decision === 'Approve' ? 'approving' : 'rejecting')
     setError('')
     setActionMessage('')
+    setWarningConfirmation(null)
     try {
+      let review = acceptedReview
       if (decision === 'Approve') {
+        if (!acceptedReview) {
         await aiSchedulesApi.updatePending(schedule.id, { scheduleData: draftData })
         const fresh = await aiSchedulesApi.getPendingById(schedule.id)
         setSchedule(fresh)
         setDraftData(JSON.parse(JSON.stringify(fresh.scheduleData)))
-        if (fresh.validation?.validationState === 'NEEDS_REVIEW') {
+        review = fresh.validation ?? undefined
+        if (fresh.validation?.issues.some(issue => issue.blocksApproval)) {
           setError('Draft saved. Resolve the validation issues below before approving.')
           return
         }
+        if (review?.issues.some(issue => issue.severity === 'WARNING' && !issue.blocksApproval)) {
+          setWarningConfirmation(review)
+          setWarningsAccepted(false)
+          return
+        }
+        }
       }
       const result = decision === 'Approve'
-        ? await aiSchedulesApi.approve({ scheduleId: schedule.id, leaderId: user.id })
+        ? await aiSchedulesApi.approve({ scheduleId: schedule.id, leaderId: user.id, acceptWarnings: !!acceptedReview, reviewFingerprint: review?.reviewFingerprint })
         : await aiSchedulesApi.reject({ scheduleId: schedule.id, reason: 'Rejected from AI Planner' })
       setLastDecision(decision)
       setActionMessage(result.message || (decision === 'Approve' ? 'Project created from the approved schedule.' : 'Schedule rejected.'))
@@ -363,8 +387,17 @@ export function AIPlannerPage() {
     } catch (requestError) {
       if (generationAbort.current?.signal.aborted) return
       if (requestError instanceof ApiError && requestError.status === 422) {
-        const details = requestError.details as { validation?: ScheduleValidationReport } | undefined
+        const details = requestError.details as { validation?: ScheduleValidationReport; code?: string } | undefined
         if (details?.validation) setSchedule(current => current ? { ...current, validation: details.validation } : current)
+        if (details?.code === 'DRAFT_REVIEW_CONFIRMATION_REQUIRED') {
+          setReviewNeedsReload(true)
+          try {
+            const latest = await aiSchedulesApi.getPendingById(schedule.id)
+            setSchedule(latest)
+            setDraftData(JSON.parse(JSON.stringify(latest.scheduleData)))
+            setReviewNeedsReload(false)
+          } catch { /* Keep saving/approval disabled until a successful reload. */ }
+        }
       }
       setError(requestError instanceof ApiError ? requestError.message : `Could not send the ${decision.toLowerCase()} request. Please review the fields and retry.`)
     } finally {
@@ -475,16 +508,20 @@ export function AIPlannerPage() {
           <span className="planner-review-intro__counts">{tasks.length} tasks <span aria-hidden="true">·</span> {groups.length} groups</span>
         </div>
         {loadingSchedule && <p className="planner-pending-loading" role="status">Loading saved schedule and team members…</p>}
-        {error && <div className="planner-schedule-load-error" role="alert" ref={reviewErrorRef} tabIndex={-1}><p>{error}</p>{!schedule && <Button variant="secondary" disabled={loadingSchedule} onClick={() => void loadLatestPendingSchedule()}>Retry loading</Button>}</div>}
+        {error && <div className="planner-schedule-load-error" role="alert" ref={reviewErrorRef} tabIndex={-1}><p>{error}</p>{reviewNeedsReload && schedule && <><p>Reload the latest draft before saving or approving.</p><Button disabled={loadingSchedule} onClick={() => void openPendingDraft(schedule.id)}>Reload latest draft</Button></>}{!schedule && <Button variant="secondary" disabled={loadingSchedule} onClick={() => void loadLatestPendingSchedule()}>Retry loading</Button>}</div>}
         {actionMessage && <p className="team-members-feedback team-members-feedback--success" role="status"><strong>{actionMessage}</strong></p>}
 
         {schedule && scheduleData && <>
           {typeof scheduleData.aiNote === 'string' && !!scheduleData.aiNote.trim() && <details className="planner-edit-section"><summary>Planning assumptions</summary><p>{scheduleData.aiNote}</p></details>}
-          {waterfall && <section className="planner-edit-section planner-validation" aria-label="Draft validation" aria-live="polite">
-            <h3>{hasUnsavedChanges ? 'Edits need validation' : validation?.validationState === 'READY' ? 'Ready for approval review' : 'Draft needs review'}</h3>
-            <p>{hasUnsavedChanges ? 'Save your edits to refresh the server validation report.' : validation?.validationState === 'READY' ? 'Structural checks passed. Review source meaning and estimates before approving.' : 'You can edit and save this draft. Resolve blocking issues before approval.'}</p>
-            {!!validation?.issues.length && <details open><summary>{validation.issues.filter(issue => issue.blocksApproval).length} blocking issues{hasUnsavedChanges ? ' in the last saved version' : ''}</summary><ul>{validation.issues.map((issue, index) => <li key={`${issue.code}-${index}`}><button type="button" className="planner-issue-link" onClick={() => focusIssue(issue.path)}>{issue.taskTitle ? `${issue.taskTitle}: ` : ''}{issue.message}</button>{!!issue.requirementIds?.length && <p>{issue.requirementIds.join(', ')}</p>}</li>)}</ul></details>}
+          {waterfall && <section className={`planner-edit-section planner-validation ${validation?.issues.some(issue => issue.blocksApproval) ? 'planner-validation--blocked' : 'planner-validation--ready'}`} aria-label="Draft validation" aria-live="polite">
+            <h3>{hasUnsavedChanges ? 'Edits need validation' : validation?.issues.some(issue => issue.blocksApproval) ? 'Draft needs review' : validation?.issues.some(issue => issue.severity === 'WARNING') ? 'Ready with warnings' : validation ? 'Ready for approval review' : 'Validation unavailable'}</h3>
+            <p>{hasUnsavedChanges ? 'Save your edits to refresh the server validation report.' : !validation ? 'Save or reopen the draft to load validation before approval.' : validation.issues.some(issue => issue.blocksApproval) ? 'You can edit and save this draft. Resolve blocking issues before approval.' : 'Structural checks passed. Warnings require your confirmation when approving; planning history does not block approval.'}</p>
+            {(['errors', 'warnings'] as const).map(kind => {
+              const issues = validation?.issues.filter(issue => kind === 'errors' ? issue.blocksApproval : !issue.blocksApproval && issue.severity === 'WARNING') ?? []
+              return issues.length > 0 && <details key={kind} open className={`planner-validation-${kind}`}><summary>{issues.length} {kind === 'errors' ? 'blocking issues' : 'warnings — PM review'}{hasUnsavedChanges ? ' in the last saved version' : ''}</summary><ul>{issues.map((issue, index) => <li key={`${issue.code}-${index}`}><button type="button" className="planner-issue-link" onClick={() => focusIssue(issue.path)}>{issue.taskTitle ? `${issue.taskTitle}: ` : ''}{issue.message}</button>{!!issue.requirementIds?.length && <p>{issue.requirementIds.join(', ')}</p>}</li>)}</ul></details>
+            })}
           </section>}
+          {waterfall && <DraftPlanPreview key={schedule.id} data={scheduleData} members={members} validation={validation} unsaved={hasUnsavedChanges} disabled={working !== 'idle' || reviewNeedsReload} saveError={error} onPatchTask={patchTask} onSave={saveDraft} onRecalculate={recalculateDraftDates} />}
           <section className="planner-edit-section" aria-labelledby="project-fields-heading">
             <div className="planner-edit-section__heading"><div><h3 id="project-fields-heading">Project details</h3><p>These fields become the new project when you approve.</p></div><span className="planner-edit-section__step">01</span></div>
             <div className="planner-edit-grid">
@@ -520,18 +557,13 @@ export function AIPlannerPage() {
             </div>
           </section>
 
-          {waterfall && <section className="planner-edit-section" aria-label="Waterfall phases">
-            <h3>Waterfall plan</h3>
-            <p>{TASK_PHASES.map(phase => `${taskPhaseLabel(phase)}: ${executableTasks.filter(task => task.phase === phase).length}`).join(' · ')}</p>
-            <p>Review scope, outputs and estimates. Phases run in order; independent work can overlap within a phase. Unassigned plans need staffing review.</p>
-                    </section>}
 
           {waterfall && !!scheduleData.sourceRequirements?.length && <details className="planner-edit-section"><summary>SRS reference ({scheduleData.sourceRequirements.length})</summary><p>Optional SRS reference. Review scope by feature; no requirement-ID selection is needed.</p><ul>{scheduleData.sourceRequirements.map(source => <li key={source.sourceRequirementId}><strong>{source.title || source.sourceRequirementId}</strong><p>{source.description}</p></li>)}</ul></details>}
 
-          {waterfall && scheduleData.planningDiagnostics?.reviewRequired && <details className="planner-edit-section planner-review-notes" aria-label="Schedule review notes"><summary>Planning history</summary>
+          {waterfall && scheduleData.planningDiagnostics && (scheduleData.planningDiagnostics.reviewRequired || !!scheduleData.planningDiagnostics.dateAdjustments?.length || !!scheduleData.planningDiagnostics.semanticChanges?.length) && <details className="planner-edit-section planner-review-notes" aria-label="Schedule review notes"><summary>Planning history — informational</summary>
             <h3>Schedule review notes</h3>
             <p>{scheduleData.planningDiagnostics.repairAttempts} AI repair passes · {scheduleData.planningDiagnostics.dateAdjustments?.length} date adjustments</p>
-            <p>Optional history of earlier planning adjustments. Review the current scope and task estimates before approving.</p>
+            <p>Earlier adjustments are informational and do not block approval. Current errors and warnings are listed in Draft validation above.</p>
             {scheduleData.planningDiagnostics.dateAdjustments?.some(change => change.taskTitle === null) && <p role="status">The project date estimate changed. Review the project dates above.</p>}
             {!!scheduleData.planningDiagnostics.dateAdjustments?.length && <details>
               <summary>View date adjustments</summary>
@@ -545,7 +577,7 @@ export function AIPlannerPage() {
 
           <section className="planner-edit-section" aria-labelledby="tasks-heading">
             <div className="planner-edit-section__heading"><div><Button variant="secondary" size="sm" disabled={working !== 'idle'} onClick={addTask}>Add task</Button><h3 id="tasks-heading" tabIndex={-1}>Tasks & assignments</h3><p>Adjust dates, priority, group and owners for each task.</p></div><span className="planner-edit-section__step">04</span></div>
-            <div className="planner-task-controls"><Select id="ai-task-filter" label="View phase" value={taskFilter} onChange={event => setTaskFilter(event.target.value)} options={[{ value: 'ALL', label: 'All phases' }, ...TASK_PHASES.map(phase => ({ value: phase, label: taskPhaseLabel(phase) }))]} />{scheduleData.planningPolicy === 'WATERFALL_SIMPLE_V1' && <Button variant="secondary" disabled={working !== 'idle'} onClick={() => { const result = planSimpleWaterfall(scheduleData); if (!result.planned) { setError(result.schedule.planningDiagnostics?.generationIssues?.[0]?.message || 'Check task phases, durations and prerequisites.'); return } setDraftData(result.schedule); setError(''); setActionMessage('Dates recalculated using the current task durations. Save the draft to validate.') }}>Recalculate dates</Button>}</div>
+            <div className="planner-task-controls"><Select id="ai-task-filter" label="View phase" value={taskFilter} onChange={event => setTaskFilter(event.target.value)} options={[{ value: 'ALL', label: 'All phases' }, ...TASK_PHASES.map(phase => ({ value: phase, label: taskPhaseLabel(phase) }))]} />{scheduleData.planningPolicy === 'WATERFALL_SIMPLE_V1' && <Button variant="secondary" disabled={working !== 'idle'} onClick={recalculateDraftDates}>Recalculate dates</Button>}</div>
             <div className="planner-task-edit-list">
               {tasks.map((task, taskIndex) => {
                 if (taskFilter !== 'ALL' && task.phase !== taskFilter) return null
@@ -582,11 +614,15 @@ export function AIPlannerPage() {
           <div className="planner-review-footer__message" aria-live="polite">{actionMessage || (hasUnsavedChanges ? 'You have unsaved edits.' : 'All changes are saved as a draft.')}</div>
           <div className="planner-review-footer__actions">
             <Button variant="danger" disabled={working !== 'idle' || !draftData} onClick={() => void sendDecision('Reject')}>{working === 'rejecting' ? 'Sending rejection…' : 'Reject'}</Button>
-            <Button variant="secondary" disabled={working !== 'idle'} onClick={() => void saveDraft()}>{working === 'saving' ? 'Saving draft…' : 'Save draft'}</Button>
-            <Button variant="primary" disabled={working !== 'idle' || !draftData} onClick={() => void sendDecision('Approve')}>{working === 'approving' ? 'Approving…' : 'Approve schedule'}</Button>
+            <Button variant="secondary" disabled={working !== 'idle' || reviewNeedsReload} onClick={() => void saveDraft()}>{working === 'saving' ? 'Saving draft…' : 'Save draft'}</Button>
+            <Button variant="primary" disabled={working !== 'idle' || !draftData || reviewNeedsReload} onClick={() => void sendDecision('Approve')}>{working === 'approving' ? 'Approving…' : 'Approve schedule'}</Button>
           </div>
         </div>}
       </div>
     </section>}
+    <Dialog open={!!warningConfirmation} title="Review warnings before approval" description="These warnings do not invalidate the schedule. Your acceptance will be recorded with this version of the draft." onClose={() => setWarningConfirmation(null)} actions={<><Button onClick={() => setWarningConfirmation(null)}>Back to draft</Button><Button variant="primary" disabled={!warningsAccepted || working !== 'idle'} onClick={() => { if (warningConfirmation && warningsAccepted) void sendDecision('Approve', warningConfirmation) }}>Accept warnings and approve</Button></>}>
+      <ul className="planner-warning-list">{warningConfirmation?.issues.filter(issue => issue.severity === 'WARNING' && !issue.blocksApproval).map((issue, index) => <li key={`${issue.code}-${index}`}>{issue.taskTitle && <strong>{issue.taskTitle}: </strong>}{issue.message}</li>)}</ul>
+      <label className="planner-warning-acceptance"><input type="checkbox" checked={warningsAccepted} onChange={event => setWarningsAccepted(event.target.checked)} />I have reviewed and accept these warnings.</label>
+    </Dialog>
   </div>
 }
